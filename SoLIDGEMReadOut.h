@@ -59,6 +59,8 @@ class SoLIDGEMReadOut : public THaSubDetector{
   Double_t          GetResolution()  const { return fResolution; }
   Int_t             GetNSigStrips()  const { return fSigStrips.size(); }
   Double_t          GetPitch() const { return fStripPitch; }
+  Double_t          GetOccupancy() const { return fOccupancy; }
+  Double_t          GetHitOccupancy() const { return fHitOcc; }
   Bool_t            IsNoisyEvent() {
     if ( (fHits->GetLast()+1) >= fMaxHits) return kTRUE;
     else return kFALSE;
@@ -69,6 +71,7 @@ class SoLIDGEMReadOut : public THaSubDetector{
   virtual Int_t     ReadDatabase( const TDatime& date );
   virtual Int_t     DefineVariables( EMode mode = kDefine );
   StripData_t       ChargeDep( const vector<Float_t>& amp );
+  StripData_t       ChipChargeDep( const vector<Float_t>& amp);
   Int_t             MapChannel( Int_t idx ) const;
   void              AddStrip( Int_t istrip );
   void              UpdateOffset();
@@ -95,6 +98,7 @@ class SoLIDGEMReadOut : public THaSubDetector{
   Double_t          fStartPos;        // Starting position of the readout strips
   Int_t             fNStrip;          // total number of strips on this readout
   Vflt_t            fPed;             // pedestal for each channal
+  Int_t             fDeconMode;       // 1 if the APV25 chip is in the deconvolution mode
   
   // Event data, hits etc.
   Float_t*          fADCraw;          // [fNelem] Integral of raw ADC samples

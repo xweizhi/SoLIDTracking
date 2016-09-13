@@ -127,7 +127,7 @@ THaAnalysisObject::EStatus SoLIDECal::Init( const TDatime& date )
   return fStatus = kOK;
 }
 //_________________________________________________________________________________________
-void SoLIDECal::Print( Option_t* opt ) const
+void SoLIDECal::Print( Option_t* /*opt*/ ) const
 {
 
 }
@@ -137,12 +137,12 @@ void SoLIDECal::PrintDataBase() const
 
 }
 //__________________________________________________________________________________________
-Int_t SoLIDECal::Begin( THaRunBase* r )
+Int_t SoLIDECal::Begin( THaRunBase* /*r*/ )
 {
   return 0;
 }
 //_________________________________________________________________________________________
-Int_t SoLIDECal::End( THaRunBase* r )
+Int_t SoLIDECal::End( THaRunBase* /*r*/ )
 {
   return 0;
 }

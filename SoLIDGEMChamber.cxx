@@ -54,11 +54,16 @@ void SoLIDGEMChamber::Clear( Option_t* opt)
       fGEMReadOut[i]->Clear(opt);
     }
   }
+  fUOccupancy = 0;
+  fVOccupancy = 0;
+  fUHitOccupancy = 0;
+  fVHitOccupancy = 0;
   fHits->Clear(opt);
 }
 //_________________________________________________________________________________________
 Int_t SoLIDGEMChamber::Decode( const THaEvData& evdata)
 {
+
   static const char* const here = "SoLIDGEMChamber::Decode";
   //decode raw data from the two readout plane the chamber has
   for (Int_t i=0; i<fNReadOut; i++){
@@ -83,6 +88,11 @@ Int_t SoLIDGEMChamber::Decode( const THaEvData& evdata)
   assert(uhits && vhits);
   Int_t nHit = ProcessRawHits(uhits, vhits);
   
+  fUOccupancy = fGEMReadOut[0]->GetOccupancy();
+  fVOccupancy = fGEMReadOut[1]->GetOccupancy();
+  fUHitOccupancy = fGEMReadOut[0]->GetHitOccupancy();
+  fVHitOccupancy = fGEMReadOut[1]->GetHitOccupancy();
+
   return 1;
 }
 //_________________________________________________________________________________________
@@ -367,7 +377,8 @@ Int_t SoLIDGEMChamber::ProcessRawHits(TSeqCollection* uhits, TSeqCollection* vhi
       }
     }
   }
-  
+  //sort the hit array now from small radius to large radius
+  fHits->Sort(); 
   return nHit;
 }
 //____________________________________________________________________________________________

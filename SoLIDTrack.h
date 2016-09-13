@@ -11,7 +11,7 @@ class SoLIDTrack : public TObject
   public:
   SoLIDTrack():fCoarseChi2(kINFINITY), fFineChi2(kINFINITY), fIsCoarseFitted(kFALSE), 
   fIsFineFitted(kFALSE), fStatus(1), fCharge(-1.), fMass(0.51e-3), 
-  fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.) {}
+  fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.), fPhi(0.), fNDF(1) {}
   ~SoLIDTrack(){}
   
   virtual Int_t Compare( const TObject* obj ) const;
@@ -23,7 +23,7 @@ class SoLIDTrack : public TObject
   void         SetFineChi2(Double_t chi2)    { fFineChi2 = chi2; }
   void         SetStatus(Bool_t is)          { fStatus = is; }
   void         SetCharge(Double_t charge)    { fCharge = charge; }
-  void         SetMaxx(Double_t mass)        { fMass = mass; }
+  void         SetMass(Double_t mass)        { fMass = mass; }
   void         SetPID(Int_t pid)             { fPID = pid; }
   void         SetAngleFlag(Int_t angleflag) { fAngleFlag = angleflag; }
   void         SetMomMax(Double_t mommax)    { fMomMax = mommax; }
@@ -34,7 +34,8 @@ class SoLIDTrack : public TObject
   void         SetVertexZ(Double_t vertexz)  { fVertexZ = vertexz; }
   void         SetTheta(Double_t theta)      { fTheta = theta; }
   void         SetPhi(Double_t phi)          { fPhi = phi; } 
-   
+  void         SetNDF(Int_t ndf)             { fNDF = ndf; }
+ 
   Bool_t       IsCoarseFitted()        const { return fIsCoarseFitted; }
   Bool_t       IsFineFitted()          const { return fIsFineFitted; }
   Double_t     GetChi2()               const { return fIsFineFitted ? fFineChi2 : fCoarseChi2; }
@@ -54,6 +55,9 @@ class SoLIDTrack : public TObject
   Double_t     GetVertexZ()            const { return fVertexZ; }
   Double_t     GetTheta()              const { return fTheta; }
   Double_t     GetPhi()                const { return fPhi; }
+  Int_t        GetNDF()                const { return fNDF; }
+  Double_t     GetChi2perNDF()         const { return fIsFineFitted ? 
+               fFineChi2/(Double_t)fNDF : fCoarseChi2/(Double_t)fNDF; }
   
   void         AddHit(SoLIDGEMHit* theHit) { fHits.push_back(theHit); }
   
@@ -66,6 +70,13 @@ class SoLIDTrack : public TObject
   Double_t     GetHitX4()              const { return GetHitInfo(4, 0); }
   Double_t     GetHitX5()              const { return GetHitInfo(5, 0); }
   
+  Double_t     GetPredHitX0()          const { return GetHitInfo(0, 7); }
+  Double_t     GetPredHitX1()          const { return GetHitInfo(1, 7); }
+  Double_t     GetPredHitX2()          const { return GetHitInfo(2, 7); }
+  Double_t     GetPredHitX3()          const { return GetHitInfo(3, 7); }
+  Double_t     GetPredHitX4()          const { return GetHitInfo(4, 7); }
+  Double_t     GetPredHitX5()          const { return GetHitInfo(5, 7); }
+  
   Double_t     GetHitY0()              const { return GetHitInfo(0, 1); }
   Double_t     GetHitY1()              const { return GetHitInfo(1, 1); }
   Double_t     GetHitY2()              const { return GetHitInfo(2, 1); }
@@ -73,13 +84,58 @@ class SoLIDTrack : public TObject
   Double_t     GetHitY4()              const { return GetHitInfo(4, 1); }
   Double_t     GetHitY5()              const { return GetHitInfo(5, 1); }
   
+  Double_t     GetPredHitY0()          const { return GetHitInfo(0, 8); }
+  Double_t     GetPredHitY1()          const { return GetHitInfo(1, 8); }
+  Double_t     GetPredHitY2()          const { return GetHitInfo(2, 8); }
+  Double_t     GetPredHitY3()          const { return GetHitInfo(3, 8); }
+  Double_t     GetPredHitY4()          const { return GetHitInfo(4, 8); }
+  Double_t     GetPredHitY5()          const { return GetHitInfo(5, 8); }
+  
   Double_t     GetHitTracker0()        const { return GetHitInfo(0, 5); }
   Double_t     GetHitTracker1()        const { return GetHitInfo(1, 5); }
   Double_t     GetHitTracker2()        const { return GetHitInfo(2, 5); }
   Double_t     GetHitTracker3()        const { return GetHitInfo(3, 5); }
   Double_t     GetHitTracker4()        const { return GetHitInfo(4, 5); }
   Double_t     GetHitTracker5()        const { return GetHitInfo(5, 5); }
-          
+  
+  Double_t     GetPredHiteX0()          const { return GetHitInfo(0, 9); }
+  Double_t     GetPredHiteX1()          const { return GetHitInfo(1, 9); }
+  Double_t     GetPredHiteX2()          const { return GetHitInfo(2, 9); }
+  Double_t     GetPredHiteX3()          const { return GetHitInfo(3, 9); }
+  Double_t     GetPredHiteX4()          const { return GetHitInfo(4, 9); }
+  Double_t     GetPredHiteX5()          const { return GetHitInfo(5, 9); }
+  
+  Double_t     GetPredHiteY0()          const { return GetHitInfo(0, 10); }
+  Double_t     GetPredHiteY1()          const { return GetHitInfo(1, 10); }
+  Double_t     GetPredHiteY2()          const { return GetHitInfo(2, 10); }
+  Double_t     GetPredHiteY3()          const { return GetHitInfo(3, 10); }
+  Double_t     GetPredHiteY4()          const { return GetHitInfo(4, 10); }
+  Double_t     GetPredHiteY5()          const { return GetHitInfo(5, 10); }
+
+  Double_t     GetHitPX0()              const { return GetHitInfo(0, 11); }
+  Double_t     GetHitPX1()              const { return GetHitInfo(1, 11); }
+  Double_t     GetHitPX2()              const { return GetHitInfo(2, 11); }
+  Double_t     GetHitPX3()              const { return GetHitInfo(3, 11); }
+  Double_t     GetHitPX4()              const { return GetHitInfo(4, 11); }
+  Double_t     GetHitPX5()              const { return GetHitInfo(5, 11); }
+
+  Double_t     GetHitPY0()              const { return GetHitInfo(0, 12); }
+  Double_t     GetHitPY1()              const { return GetHitInfo(1, 12); }
+  Double_t     GetHitPY2()              const { return GetHitInfo(2, 12); }
+  Double_t     GetHitPY3()              const { return GetHitInfo(3, 12); }
+  Double_t     GetHitPY4()              const { return GetHitInfo(4, 12); }
+  Double_t     GetHitPY5()              const { return GetHitInfo(5, 12); }
+
+  Double_t     GetHitPZ0()              const { return GetHitInfo(0, 13); }
+  Double_t     GetHitPZ1()              const { return GetHitInfo(1, 13); }
+  Double_t     GetHitPZ2()              const { return GetHitInfo(2, 13); }
+  Double_t     GetHitPZ3()              const { return GetHitInfo(3, 13); }
+  Double_t     GetHitPZ4()              const { return GetHitInfo(4, 13); }
+  Double_t     GetHitPZ5()              const { return GetHitInfo(5, 13); }
+
+  
+  static bool SortHitZ(const SoLIDGEMHit* a, const SoLIDGEMHit* b);
+  void SortHits();
   protected:
   Double_t fCoarseChi2;
   Double_t fFineChi2;
@@ -98,6 +154,7 @@ class SoLIDTrack : public TObject
   Double_t fVertexZ;
   Double_t fTheta;
   Double_t fPhi;
+  Int_t fNDF;
   std::vector<SoLIDGEMHit*> fHits;
   
   ClassDef(SoLIDTrack, 1)

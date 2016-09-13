@@ -48,6 +48,11 @@ class SoLIDGEMChamber : public THaSubDetector{
     else { return 0; }
   }
   
+  Double_t GetUOccupancy() const { return fUOccupancy; }
+  Double_t GetUHitOccupancy() const { return fUHitOccupancy; }
+  Double_t GetVOccupancy() const { return fVOccupancy; }
+  Double_t GetVHitOccupancy() const { return fVHitOccupancy; }
+  
   protected:
   virtual Int_t     ReadDatabase( const TDatime& date );
   virtual Int_t     ReadGeometry( FILE* file, const TDatime& date,
@@ -80,6 +85,10 @@ class SoLIDGEMChamber : public THaSubDetector{
   Double_t          fTrackerZ;
   TClonesArray*     fHits;        //collection for a pair of raw hits, checked by amplitude matching, 
                                   // whether inside active area of the GEM detector, and so on 
+  Double_t          fUOccupancy;
+  Double_t          fVOccupancy;
+  Double_t          fUHitOccupancy;
+  Double_t          fVHitOccupancy;
   
   std::vector<SoLIDGEMReadOut*> fGEMReadOut; //The readout plane that the chamber has, usually 2 
   ClassDef(SoLIDGEMChamber,0)      

@@ -14,7 +14,7 @@ ClassImp(SoLIDGEMTracker)
 using namespace std;
 SoLIDGEMTracker::SoLIDGEMTracker(Int_t iGEM, const char* name, const char* description,
                                  THaDetectorBase* parent)
-  : THaSubDetector(name,description,parent), fTrackerID(iGEM)
+  : THaSubDetector(name,description,parent), fTrackerID(iGEM), fNHits(0)
 {
   static const char* const here = "SoLIDGEMTracker";
   assert( name && parent );
@@ -52,6 +52,7 @@ void SoLIDGEMTracker::Clear( Option_t* opt)
     }
   }
   fHits->Clear(opt);
+  fNHits = 0;
 }
 //_________________________________________________________________________________________
 Int_t SoLIDGEMTracker::Decode( const THaEvData& evdata)
@@ -59,7 +60,7 @@ Int_t SoLIDGEMTracker::Decode( const THaEvData& evdata)
   for (Int_t i=0; i<fNChamber; i++){
     fGEMChamber[i]->Decode(evdata);
   }
-  if (fDoCombineHits) CombineChamberHits();
+  if (fDoCombineHits) fNHits = CombineChamberHits();
   return 1;
 }
 //_________________________________________________________________________________________
@@ -112,12 +113,12 @@ void SoLIDGEMTracker::PrintDataBase(Int_t level) const
   }
 } 
 //_________________________________________________________________________________________
-Int_t SoLIDGEMTracker::Begin( THaRunBase* r )
+Int_t SoLIDGEMTracker::Begin( THaRunBase* /*r*/ )
 {
   return 0;
 }
 //_________________________________________________________________________________________
-Int_t SoLIDGEMTracker::End( THaRunBase* r )
+Int_t SoLIDGEMTracker::End( THaRunBase* /*r*/ )
 {
   return 0;
 }
@@ -154,35 +155,41 @@ Int_t SoLIDGEMTracker::DefineVariables( EMode mode )
   fIsSetup = ( mode == kDefine );
   // Register variables in global list
   Int_t ret;
-#ifdef MCDATA//FIXME:probably a bug
+
   if( !dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->TestBit(SoLIDTrackerSystem::kMCData) ) {
-#endif
-     // Non-Monte Carlo hit data
-    RVarDef nonmcvars[] = {
-      { "hit2D.x",       "2D hit x coordinate",          "fHits.SoLIDGEMHit.GetX()"         },
-      { "hit2D.y",       "2D hit y coordinate",          "fHits.SoLIDGEMHit.GetY()"         },
-      { "hit2D.z",       "2D hit z coordinate",          "fHits.SoLIDGEMHit.GetZ()"         },
-      { "hit2D.r",       "2D hit r coordinate",          "fHits.SoLIDGEMHit.GetR()"         },
-      { "hit2D.phi",     "2D hit phi coordinate",        "fHits.SoLIDGEMHit.GetPhi()"       },
-      { "hit2D.chamber", "2D hit chamber ID",            "fHits.SoLIDGEMHit.GetChamberID()" },
-      { 0 }   
+    RVarDef vars[] = {
+      { "nhits",       "total number of hits on this tracker", "GetNHits()"        },
+      { 0 },
     };
-    ret = DefineVarsFromList( nonmcvars, mode );
+  ret = DefineVarsFromList( vars, mode );
   }else{
+#ifdef MCDATA
     //Monte-Carlo hit data
     RVarDef mcvars[] = {
+      { "nhits",       "total number of hits on this tracker", "GetNHits()"        },
       { "hit2D.x",       "2D hit x coordinate",            "fHits.SoLIDMCGEMHit.GetX()"        },
       { "hit2D.y",       "2D hit y coordinate",            "fHits.SoLIDMCGEMHit.GetY()"        },
       { "hit2D.z",       "2D hit z coordinate",            "fHits.SoLIDMCGEMHit.GetZ()"        },
       { "hit2D.r",       "2D hit r coordinate",            "fHits.SoLIDMCGEMHit.GetR()"        },
       { "hit2D.qu",      "2D hit charge deposition on u",  "fHits.SoLIDMCGEMHit.GetQU()"       },
       { "hit2D.qv",      "2D hit charge deposition on v",  "fHits.SoLIDMCGEMHit.GetQV()"       },
+      { "hit2D.upos",    "2D hit position on u",           "fHits.SoLIDMCGEMHit.GetUPos()"     },
+      { "hit2D.vpos",    "2D hit position on v",           "fHits.SoLIDMCGEMHit.GetVPos()"     },
+      { "hit2D.usize",   "2D hit cluster size on u",      "fHits.SoLIDMCGEMHit.GetUSize()"  },
+      { "hit2D.vsize",   "2D hit cluster size on v",      "fHits.SoLIDMCGEMHit.GetVSize()"  },
+      { "hit2D.umcpos",  "2D hit mc position on u",        "fHits.SoLIDMCGEMHit.GetUPosMC()"   },
+      { "hit2D.vmcpos",  "2D hit mc position on v",        "fHits.SoLIDMCGEMHit.GetVPosMC()"   },
       { "hit2D.phi",     "2D hit phi coordinate",          "fHits.SoLIDMCGEMHit.GetPhi()"      },
       { "hit2D.signal",  "if this hit is signal",          "fHits.SoLIDMCGEMHit.IsSignalHit()" },
       { "hit2D.chamber", "2D hit chamber ID",              "fHits.SoLIDGEMHit.GetChamberID()"  },
+      { "u.occu",        "occupancy pass noise cut",       "GetUMeanOccu()"                   },
+      { "v.occu",        "occupancy pass noise cut",       "GetVMeanOccu()"                   },
+      { "u.rawoccu",    "deconvoluted occupancy for u",   "GetUMeanHitOccu()"                },
+      { "v.rawoccu",    "deconvoluted occupancy for v",   "GetVMeanHitOccu()"                },
       { 0 }
     };
     ret = DefineVarsFromList( mcvars, mode );
+#endif
   }
   
   return ret;
@@ -190,36 +197,61 @@ Int_t SoLIDGEMTracker::DefineVariables( EMode mode )
 //___________________________________________________________________________________________
 Int_t SoLIDGEMTracker::CombineChamberHits()
 {
-  //first check if the total hits on all chamber is too large
+  //collect all the MC hits info here on this GEM tracker
+
   assert(fDoCombineHits == 1);
-  Int_t totalHit = 0;
-  for (Int_t i=0; i<fNChamber; i++){
-    totalHit += fGEMChamber[i]->GetNHits();
-  }
-  if (totalHit>=OUTMAX) cout<<"too many hits on tracker: "<<fTrackerID<<" ("<<totalHit<<")"<<endl;
-  if (totalHit>=OUTMAX) return 0;
-  Bool_t mc_data = dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->TestBit(SoLIDTrackerSystem::kMCData);
+  Int_t nTotalHits = 0;
   Int_t nHit = 0;
   for (Int_t i=0; i<fNChamber; i++){
     TSeqCollection* hits = fGEMChamber[i]->GetHits();
+    nTotalHits += hits->GetEntries();
     for (Int_t j=0; j<fGEMChamber[i]->GetNHits(); j++){
-       if (!mc_data){
-         SoLIDGEMHit *thisHit = (SoLIDGEMHit*)hits->At(j);
-         new ( (*fHits)[nHit++]) SoLIDGEMHit(*thisHit);
-       }else{
 #ifdef MCDATA
-         SoLIDMCGEMHit *thisHit = (SoLIDMCGEMHit*)hits->At(j);
-         new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*thisHit);
+       SoLIDMCGEMHit *thisHit = (SoLIDMCGEMHit*)hits->At(j);
+       if (!thisHit->IsSignalHit()) continue;
+       new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*thisHit);
 #endif
-       }
     }
     
-  }
-  
-  assert(nHit == totalHit);
-  return 1;
+  } 
+  return nTotalHits;
 }
-
+//_____________________________________________________________________________________________
+Double_t SoLIDGEMTracker::GetUMeanOccu()
+{
+  Double_t meanUOccu = 0.;
+  for (Int_t i=0; i<fNChamber; i++){
+    meanUOccu += fGEMChamber[i]->GetUOccupancy(); 
+  }
+  return meanUOccu/(Double_t)fNChamber;
+}
+//_____________________________________________________________________________________________
+Double_t SoLIDGEMTracker::GetVMeanOccu()
+{
+  Double_t meanVOccu = 0.;
+  for (Int_t i=0; i<fNChamber; i++){
+    meanVOccu += fGEMChamber[i]->GetVOccupancy(); 
+  }
+  return meanVOccu/(Double_t)fNChamber;
+}
+//______________________________________________________________________________________________
+Double_t SoLIDGEMTracker::GetUMeanHitOccu()
+{
+  Double_t meanUOccu = 0.;
+  for (Int_t i=0; i<fNChamber; i++){
+    meanUOccu += fGEMChamber[i]->GetUHitOccupancy(); 
+  }
+  return meanUOccu/(Double_t)fNChamber;
+}
+//______________________________________________________________________________________________
+Double_t SoLIDGEMTracker::GetVMeanHitOccu()
+{
+  Double_t meanVOccu = 0.;
+  for (Int_t i=0; i<fNChamber; i++){
+    meanVOccu += fGEMChamber[i]->GetVHitOccupancy(); 
+  }
+  return meanVOccu/(Double_t)fNChamber;
+}
 
 
 

@@ -32,6 +32,8 @@
 #include "SoLIDGEMTracker.h"
 #include "SoLIDECal.h"
 #include "ProgressiveTracking.h"
+#include "SoLIDFieldMap.h"
+#include "SoLKalTrackFinder.h"
 
 class SoLIDTrackerSystem : public THaTrackingDetector {
   public:
@@ -61,7 +63,10 @@ class SoLIDTrackerSystem : public THaTrackingDetector {
     void    SetSystemID( Int_t i ) { fSystemID = i; }
     Int_t   GetSystemID() const    { return fSystemID; }
     Int_t   GetNTracks()  const    { return fTracks->GetLast() + 1; }
-    
+    Int_t   GetNSeeds()   const    { return fTrackFinder->GetNSeeds(); }
+    bool    GetSeedEfficiency() const { return fTrackFinder->GetSeedEfficiency();} 
+    bool    GetMCTrackEfficiency() const { return fTrackFinder->GetMCTrackEfficiency();}  
+ 
     SoLIDGEMTracker * GetTracker(Int_t i) const {
       if (i >= 0 && i<fNTracker ) { return fGEMTracker[i]; }
       else { return 0; }
@@ -98,6 +103,7 @@ class SoLIDTrackerSystem : public THaTrackingDetector {
 
     std::vector<SoLIDGEMTracker*> fGEMTracker;
     SoLIDECal*     fECal;
+    SoLIDFieldMap* fFieldMap;
     
     TClonesArray*  fTracks;         // array for storing SoLIDTrack(SoLIDMCTrack) objects
     // Configuration
@@ -108,8 +114,10 @@ class SoLIDTrackerSystem : public THaTrackingDetector {
     Int_t          fNMaxMissHit;    //maximum number of hits that is allowed in the coarse tracking
     
     
-    ProgressiveTracking* fTrackFinder; 
+    SoLKalTrackFinder* fTrackFinder; 
 #ifdef MCDATA
+    const Podd::SimDecoder* fMCDecoder; //! MC data decoder (if kMCdata)
+    Bool_t fChecked;
     virtual Int_t FitMCPoints( Podd::MCTrack* mctrk ) const;
     Int_t         fGoodSignalFlag;
 #endif

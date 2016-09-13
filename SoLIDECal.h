@@ -8,6 +8,8 @@
 //Hall A Analyzer
 #include "THaDetMap.h"
 #include "THaSubDetector.h"
+//SoLIDTracking
+#include "SoLIDUtility.h"
 
 using namespace std;
 
@@ -35,6 +37,11 @@ class SoLIDECal : public THaSubDetector
   UInt_t  GetNFAECHits()    const { return fNFAECHits; }
   map< Int_t, vector<Float_t> > * GetLAECHits()  { return &fLAECHitMap; }
   map< Int_t, vector<Float_t> > * GetFAECHits()  { return &fFAECHitMap; }                
+
+  inline Double_t GetECZ(ECType type) const { if (type == kFAEC) return fFAECZ;
+                                              else return fLAECZ; }
+  inline Double_t GetPosReso() const { return fPosReso; }
+  inline Double_t GetEReso() const { return fEReso; }
   
   void    SmearPosition(Float_t *x, Float_t *y);
   void    SmearEnergy(Float_t *energy);

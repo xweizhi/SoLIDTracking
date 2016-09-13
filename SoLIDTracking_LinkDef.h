@@ -19,7 +19,14 @@
 #pragma link C++ class SoLIDRawHit+;
 #pragma link C++ class SoLIDGEMHit+;
 #pragma link C++ class SoLIDTrack+;
-#pragma link C++ class ProgressiveTracking;
+#pragma link C++ class ProgressiveTracking+;
+#pragma link C++ class SoLIDFieldMap+;
+#pragma link C++ class SoLKalTrackFinder+;
+#pragma link C++ class SoLKalMatrix+;
+#pragma link C++ class SoLKalTrackSystem+;
+#pragma link C++ class SoLKalTrackState+;
+#pragma link C++ class SoLKalTrackSite+;
+#pragma link C++ class SoLKalFieldStepper+;
 #ifdef MCDATA
 #pragma link C++ class SoLIDMCRawHit+;
 #pragma link C++ class SoLIDMCGEMHit+;

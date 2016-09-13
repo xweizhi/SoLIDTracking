@@ -30,7 +30,7 @@ SoLIDGEMReadOut::SoLIDGEMReadOut(Int_t ireadout, const char* name, const char* d
   fNRawStrips(0), fNHitStrips(0), fHitOcc(0), fOccupancy(0), fHits(0), fMapType(kOneToOne), 
   fADCMap(0)
 #ifdef MCDATA
-  , fHitMap(0), fMCHitInfo(0)
+  , fMCHitInfo(0), fHitMap(0)
 #endif
 
 {
@@ -186,7 +186,7 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
       assert( nsamp > 0 );
       ++fNRawStrips;
       nsamp = TMath::Min( nsamp, static_cast<Int_t>(fMaxTimeSample) );
-
+      if (fDeconMode) nsamp = 5;
       // Integrate the signal over time and analyze pulse shape
       StripData_t stripdata;
       if( nsamp > 1 ) {
@@ -197,7 +197,11 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
 	  samples.push_back( fsamp );
 	}
 	// Analyze the pulse shape
-	stripdata = ChargeDep(samples);
+	if (fDeconMode){
+          stripdata = ChipChargeDep(samples);
+        }else{
+	  stripdata = ChargeDep(samples);
+        }
       }
       else {
 	stripdata.adcraw = stripdata.adc =
@@ -262,7 +266,7 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
 
   fHitOcc    = static_cast<Double_t>(fNHitStrips) / fNStrip;
   fOccupancy = static_cast<Double_t>(GetNSigStrips()) / fNStrip;
-
+  
    // Find and analyze clusters. Clusters of active strips are considered
   // a "Hit".
   //
@@ -317,7 +321,7 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
     // 3: split, well-defined peak found (may still be larger than maxsize)
     Int_t  type = 0;
     UInt_t size = *cur - *start + 1;
-    if( size > fMaxClusterSize ) {
+    if( size > (UInt_t)fMaxClusterSize ) {
       Double_t maxadc = 0.0, minadc = kBig;
       viter_t it = start, maxpos = start, minpos = start;
       enum EStep { kFindMax = 1, kFindMin, kDone };
@@ -492,7 +496,7 @@ THaAnalysisObject::EStatus SoLIDGEMReadOut::Init( const TDatime& date )
   return fStatus = kOK;
 }
 //_________________________________________________________________________________________
-void SoLIDGEMReadOut::Print( Option_t* opt ) const
+void SoLIDGEMReadOut::Print( Option_t* /*opt*/ ) const
 {
 
 }
@@ -536,12 +540,12 @@ void SoLIDGEMReadOut::PrintDataBase(Int_t level) const
   }
 } 
 //_________________________________________________________________________________________
-Int_t SoLIDGEMReadOut::Begin( THaRunBase* r )
+Int_t SoLIDGEMReadOut::Begin( THaRunBase* /*r*/ )
 {
   return 0;
 }
 //_________________________________________________________________________________________
-Int_t SoLIDGEMReadOut::End( THaRunBase* r )
+Int_t SoLIDGEMReadOut::End( THaRunBase* /*r*/ )
 {
   return 0;
 }
@@ -595,6 +599,7 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
           { "dphi",                &fDPhi,            kDouble,  0, 1 },
           { "start",               &fStartPos,        kDouble,  0, 1 },
           { "nstrips",             &fNStrip,          kInt,     0, 1 },
+          { "deconmode",           &fDeconMode,       kInt,     0, 1 },
           { "mapping",             &mapping,          kTString, 0, 1 }, // not using it right now
           { "chanmap",             &fChanMap,         kIntV,    0, 1 }, // not using it right now
           { "pedestal",            &fPed,             kFloatV,  0, 1 }, // not using it right now
@@ -759,7 +764,7 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
   static const UInt_t max_maxsamp = 32; // arbitrary sanity limit
   if( fMaxTimeSample == 0 )
     fMaxTimeSample = 1;
-  else if( fMaxTimeSample > max_maxsamp ) {
+  else if( fMaxTimeSample > (Int_t)max_maxsamp ) {
     Warning( Here(here), "Illegal maximum number of samples: %u. "
              "Adjusted to maximum allowed = %u.", fMaxTimeSample, max_maxsamp );
     fMaxTimeSample = max_maxsamp;
@@ -856,12 +861,15 @@ StripData_t SoLIDGEMReadOut::ChargeDep( const vector<Float_t>& amp )
   // NIM A326, 112 (1993)
 
   //FIXME: from database, proper value for Tp
-  const Float_t delta_t = 25.0; // time interval between samples (ns)
-  const Float_t Tp      = 50.0; // RC filter time constant (ns)
+  //const Float_t delta_t = 25.0; // time interval between samples (ns)
+  //const Float_t Tp      = 50.0; // RC filter time constant (ns)
 
   assert( amp.size() >= 3 );
 
-  Float_t adcraw = delta_t*(amp[0]+amp[1]+amp[2]);
+  //Float_t adcraw;
+
+  //adcraw = delta_t*(amp[0]+amp[1]+amp[2]);
+  
 
   // Weight factors calculated based on the response of the silicon microstrip
   // detector:
@@ -871,32 +879,73 @@ StripData_t SoLIDGEMReadOut::ChargeDep( const vector<Float_t>& amp )
   // where A is the amplitude, t0 the begin of the rise, tau1 the time
   // parameter for the rising edge and tau2 the for the falling edge.
 
+  //Float_t x = delta_t/Tp;
+
+  //Float_t w1 = TMath::Exp(x-1)/x;
+  //Float_t w2 = -2*TMath::Exp(-1)/x;
+  //Float_t w3 = TMath::Exp(-x-1)/x;
+
+  // Deconvoluted signal samples, assuming measurements of zero before the
+  // leading edge
+  /*Float_t sig[3] = { amp[0]*w1,
+                     amp[1]*w1+amp[0]*w2,
+                     amp[2]*w1+amp[1]*w2+amp[0]*w3 };*/
+  //Float_t adc;
+  
+  //this adc value may not be very reliable, we assume that the time sample befre
+  //the trigger start time is 0, but for background, this is not true, and this 
+  //deconvolution algorithm can give rather strange behavior
+  
+  //adc    = delta_t*(sig[0]+sig[1]+sig[2]);
+  
+  //I just use the 2nd time sample, becuase it should be at roughly the peak position
+  //and thus has the best signal to background ratio, in this case, we don't need to 
+  //deconvolute anymore
+  
+  //adc = amp[2];
+  
+  Float_t time   = 0;     // TODO
+
+  Bool_t pass;
+  // Calculate ratios for 3 samples and check for bad signals
+  
+  if( amp[2] > fADCMin ) {
+    Double_t r1 = amp[0]/amp[2];
+    Double_t r2 = amp[1]/amp[2];
+    pass = (r1 < 1.0 and r2 < 1.0 and r1 < r2);
+    } else
+     pass = false;
+  
+
+  return StripData_t(amp[2], amp[2], time, pass);
+
+}
+//_____________________________________________________________________________________
+StripData_t SoLIDGEMReadOut::ChipChargeDep( const vector<Float_t>& amp )
+{
+  const Float_t delta_t = 25.0; // time interval between samples (ns)
+  const Float_t Tp      = 50.0; // RC filter time constant (ns)
+
+  assert( amp.size() >= 5 );
+
+  Float_t adcraw = delta_t*(amp[2]+amp[3]+amp[4]);
+
   Float_t x = delta_t/Tp;
 
   Float_t w1 = TMath::Exp(x-1)/x;
   Float_t w2 = -2*TMath::Exp(-1)/x;
   Float_t w3 = TMath::Exp(-x-1)/x;
 
-  // Deconvoluted signal samples, assuming measurements of zero before the
-  // leading edge
-  Float_t sig[3] = { amp[0]*w1,
-                     amp[1]*w1+amp[0]*w2,
-                     amp[2]*w1+amp[1]*w2+amp[0]*w3 };
-
-  Float_t adc    = delta_t*(sig[0]+sig[1]+sig[2]);
+   Float_t sig[3] = { amp[2]*w1 + amp[1]*w2 + amp[0]*w3,
+                      amp[3]*w1 + amp[2]*w2 + amp[1]*w3,
+                      amp[4]*w1 + amp[3]*w2 + amp[2]*w3   };
+  Float_t adc = sig[1];
+  //cout<<amp[0]<<" "<<amp[1]<<" "<<amp[2]<<" "<<amp[3]<<" "<<amp[4]<<" "<<sig[1]<<endl;
   Float_t time   = 0;     // TODO
 
-  Bool_t pass;
-  // Calculate ratios for 3 samples and check for bad signals
-  if( amp[2] > 0 ) {
-    Double_t r1 = amp[0]/amp[2];
-    Double_t r2 = amp[1]/amp[2];
-    pass = (r1 < 1.0 and r2 < 1.0 and r1 < r2);
-  } else
-    pass = false;
+  Bool_t pass = true;
   
   return StripData_t(adcraw,adc,time,pass);
-
 }
 //______________________________________________________________________________________
 Int_t SoLIDGEMReadOut::MapChannel( Int_t idx ) const

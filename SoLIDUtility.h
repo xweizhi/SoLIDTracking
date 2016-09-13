@@ -5,7 +5,20 @@
 #include "TObject.h"
 #include <iostream>
 #include <algorithm>
+#include <cassert>
 using namespace std;
+#define kSdim 5
+#define kMdim 2
+#define kGiga 1.e9
+enum ECType{kLAEC = 0, kFAEC};
+enum SoLKalIndex{ kIdxX0 = 0, kIdxY0, kIdxTX, kIdxTY, kIdxQP, kIdxZ0};
+enum SoLMatType{kAir = 0, kGEM};
+enum SeedType{kMidBack = 0, kFrontMid, kFrontBack, kTriplet};
+enum SoLMatPropertyIdx{ kAtomicNum = 0, kProtonNum, kExcitEnergy, kDensity, kRadLength }; 
+static const double kElectronMass = 0.51099891;
+static const double kPimMass = 139.57018;
+static const double kProtonMass = 938.2720813;
+
 
 class CSpair : public TObject {
 public:
@@ -96,5 +109,29 @@ inline Int_t NumberOfSetBits( UInt_t v )
   return (((v + (v >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
 
-
+//_____________________________________________________________________________
+struct SoLIDCaloHit{
+  Double_t fXPos;
+  Double_t fYPos;
+  Int_t    fECID;
+  Double_t fEdp;
+  SoLIDCaloHit() {}
+  SoLIDCaloHit(Double_t xpos, Double_t ypos, Int_t plane, Double_t edp) :
+  fXPos(xpos), fYPos(ypos), fECID(plane), fEdp(edp) {}
+};
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

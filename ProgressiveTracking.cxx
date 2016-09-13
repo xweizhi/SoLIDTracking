@@ -3,8 +3,8 @@
 #include "TMath.h"
 //SoLIDTracking
 #include "ProgressiveTracking.h"
+#include "SoLIDUtility.h"
 
-enum ECType{kLAEC = 0, kFAEC};
 ProgressiveTracking::ProgressiveTracking(Int_t ntracker, Bool_t isMC) : 
 fNTracker(ntracker), fDoMC(isMC),
 fNElectron(1), fNHadron(0), fNTrack(0), fIsIterBackward(kTRUE), fHasCaloHit(kTRUE)
@@ -79,12 +79,12 @@ void ProgressiveTracking::ProcessHits(map<Int_t, vector<TSeqCollection*> > *theH
   FindTrack(0, 2, theHitMap);
   FindTrack(0, 3, theHitMap);
   FindTrack(0, 4, theHitMap);
-  FindTrack(1, 0, theHitMap);
-  FindTrack(1, 1, theHitMap);
-  FindTrack(1, 2, theHitMap);
-  FindTrack(1, 3, theHitMap);
-  FindTrack(1, 4, theHitMap);
-  FindTrack(1, 5, theHitMap);
+  //FindTrack(1, 0, theHitMap);
+  //FindTrack(1, 1, theHitMap);
+  //FindTrack(1, 2, theHitMap);
+  //FindTrack(1, 3, theHitMap);
+  //FindTrack(1, 4, theHitMap);
+  //FindTrack(1, 5, theHitMap);
   //cout<<fNTrack<<endl;
   CheckTracks();
   CombineTrackRoad(theTracks);

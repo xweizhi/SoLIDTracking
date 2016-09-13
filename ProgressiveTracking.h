@@ -64,15 +64,7 @@ class ProgressiveTracking
   Int_t              fNGoodHits[6];
   TClonesArray*      fGoodHits[6];
   
-  struct SoLIDCaloHit{
-  Double_t fXPos;
-  Double_t fYPos;
-  Int_t    fECID;
-  Double_t fEdp;
-  SoLIDCaloHit() {}
-  SoLIDCaloHit(Double_t xpos, Double_t ypos, Int_t plane, Double_t edp) :
-  fXPos(xpos), fYPos(ypos), fECID(plane), fEdp(edp) {}
-  };
+  
   vector<SoLIDCaloHit> fCaloHits;
   
 };

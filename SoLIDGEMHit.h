@@ -100,9 +100,14 @@ class SoLIDGEMReadOut;
 //a pair of hits, one from u and the other from v readout plane
   class SoLIDGEMHit : public TObject {
     public:
+    SoLIDGEMHit() {};
     SoLIDGEMHit(Int_t chamberID, Int_t trackerID, Double_t r, Double_t phi, Double_t z, Hit* uhit, Hit* vhit);
     ~SoLIDGEMHit(){};
     
+    virtual Bool_t IsSortable () const { return kTRUE; }
+    virtual Int_t Compare( const TObject* obj ) const;
+    
+    Bool_t IsUsed() const { return fIsUsed; }
     Int_t GetChamberID() const { return fChamberID; }
     Int_t GetTrackerID() const { return fTrackerID; }
     Double_t GetZ() const { return fZ; }
@@ -112,10 +117,28 @@ class SoLIDGEMReadOut;
     Double_t GetPhi() const { return fPhi; }
     Double_t GetQU() const { return dynamic_cast<SoLIDRawHit*>(fUHit)->GetADCsum(); }
     Double_t GetQV() const { return dynamic_cast<SoLIDRawHit*>(fVHit)->GetADCsum(); }
+    Double_t GetUPos() const { return dynamic_cast<SoLIDRawHit*>(fUHit)->GetPos(); }
+    Double_t GetVPos() const { return dynamic_cast<SoLIDRawHit*>(fVHit)->GetPos(); }
+    UInt_t   GetUSize() const { return dynamic_cast<SoLIDRawHit*>(fUHit)->GetSize(); }
+    UInt_t   GetVSize() const { return dynamic_cast<SoLIDRawHit*>(fVHit)->GetSize(); }
+    Double_t GetPredX() const { return fPredictX; }
+    Double_t GetPredY() const { return fPredictY; }
+    Double_t GetPredeX() const { return fPredicteX; }
+    Double_t GetPredeY() const { return fPredicteY; }
+    Double_t GetPX() const { return fPX; }
+    Double_t GetPY() const { return fPY; }
+    Double_t GetPZ() const { return fPZ; }
+
+    
     Hit * GetUHit() const { return fUHit; }
     Hit * GetVHit() const { return fVHit; }
     
+    void SetPredictHit(Double_t x, Double_t y, Double_t ex, Double_t ey);
+    void SetMomentum(Double_t px, Double_t py, Double_t pz);
+    void SetUsed() { fIsUsed = kTRUE; }
     protected:
+    Bool_t   fIsUsed;
+    
     Int_t    fChamberID;
     Int_t    fTrackerID;
     Double_t fX;
@@ -125,6 +148,14 @@ class SoLIDGEMReadOut;
     Double_t fZ;
     Hit *fUHit;
     Hit *fVHit;
+    //for Kalman Filter Study;
+    Double_t fPredictX;
+    Double_t fPredictY;
+    Double_t fPredicteX;
+    Double_t fPredicteY;
+    Double_t fPX;
+    Double_t fPY;
+    Double_t fPZ;
     
     ClassDef(SoLIDGEMHit, 1)
   };
@@ -132,6 +163,7 @@ class SoLIDGEMReadOut;
 #ifdef MCDATA
   class SoLIDMCGEMHit : public SoLIDGEMHit {
     public:
+    SoLIDMCGEMHit() {};
     SoLIDMCGEMHit(Int_t chamberID, Int_t trackerID, Double_t r, Double_t phi, Double_t z, Hit* uhit, Hit* vhit) :
     SoLIDGEMHit(chamberID, trackerID, r, phi, z, uhit, vhit) {};
     ~SoLIDMCGEMHit(){};
@@ -141,6 +173,8 @@ class SoLIDGEMReadOut;
           dynamic_cast<SoLIDMCRawHit*>(fVHit)->fMCTrack == 1) return 1;
       else return 0;
     }
+    Double_t GetUPosMC() const { return dynamic_cast<SoLIDMCRawHit*>(fUHit)->fMCPos; }
+    Double_t GetVPosMC() const { return dynamic_cast<SoLIDMCRawHit*>(fVHit)->fMCPos; }
     
     ClassDef(SoLIDMCGEMHit, 1)
   };

@@ -88,11 +88,39 @@ void SoLIDMCRawHit::Print( Option_t* ) const
 //______________________________________________________________________________
 SoLIDGEMHit::SoLIDGEMHit(Int_t chamberID, Int_t trackerID, 
 Double_t r, Double_t phi, Double_t z, Hit* uhit, Hit* vhit)
-:fChamberID(chamberID), fTrackerID(trackerID), fR(r), fPhi(phi), fZ(z), 
+:fIsUsed(kFALSE), fChamberID(chamberID), fTrackerID(trackerID), fR(r), fPhi(phi), fZ(z), 
 fUHit(uhit), fVHit(vhit)
 {
   fX = r*TMath::Cos(phi);
   fY = r*TMath::Sin(phi);
+}
+//______________________________________________________________________________
+void SoLIDGEMHit::SetPredictHit(Double_t x, Double_t y, Double_t ex, Double_t ey)
+{
+  fPredictX = x;
+  fPredictY = y;
+  fPredicteX = ex;
+  fPredicteY = ey;
+}
+//_______________________________________________________________________________
+void SoLIDGEMHit::SetMomentum(Double_t px, Double_t py, Double_t pz)
+{
+  fPX = px;
+  fPY = py;
+  fPZ = pz;
+}
+//_______________________________________________________________________________
+inline Int_t SoLIDGEMHit::Compare( const TObject* obj ) const
+ {
+   // Used for sorting hits in a TSeqCollection (e.g. TList, TClonesArray).
+   // A hit is "less than" another hit if its radius (measure from z) is smaller
+   // it might turn out that sorting in phi is better
+   
+   assert( dynamic_cast<const SoLIDGEMHit*>(obj) );
+   const SoLIDGEMHit* rhs = static_cast<const SoLIDGEMHit*>(obj);
+   if( fR  < rhs->GetR() )  return -1;
+   if( fR  > rhs->GetR() )  return  1;
+   return 0;
 }
 //_______________________________________________________________________________
 //------------------------------------------------------------------------------//

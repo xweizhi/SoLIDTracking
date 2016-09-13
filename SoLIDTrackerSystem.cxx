@@ -40,13 +40,18 @@ typedef vector<vector<Int_t> >::iterator vviter_t;
 //_____________________________________________________________________________
 SoLIDTrackerSystem::SoLIDTrackerSystem( const char* name, const char* desc, THaApparatus* app)
   :THaTrackingDetector(name,desc,app), fSystemID(-1), 
-   fPhi(0), fCrateMap(0), fTracks(0), fTrackFinder(0)
+   fPhi(0), fTracks(0), fCrateMap(0), fTrackFinder(0)
+#ifdef MCDATA
+  , fMCDecoder(0), fChecked(false)
+#endif
 {
 #ifdef MCDATA
   fTracks = new TClonesArray("SoLIDMCTrack", 10);
 #else
   fTracks = new TClonesArray("SoLIDTrack", 10);
 #endif
+
+  fFieldMap = SoLIDFieldMap::GetInstance();
 }
 
 //_____________________________________________________________________________
@@ -191,6 +196,21 @@ void SoLIDTrackerSystem::Clear(Option_t* opt)
 //_____________________________________________________________________________
 Int_t SoLIDTrackerSystem::Decode( const THaEvData& evdata)
 {
+#ifdef MCDATA
+const char* const here = "SoLIDTrackerSystem::Decode";
+  if( !fChecked ) {
+    if( TestBit(kMCData) ) {
+      fMCDecoder = dynamic_cast<const Podd::SimDecoder*>(&evdata);
+      if( fMCDecoder == 0 ) {
+        Error( Here(here), "MCdata flag set, but decoder is not a SimDecoder. "
+               "Fix database or replay configuration." );
+      }
+    }
+    fChecked = true;
+  }
+
+#endif
+
   for (Int_t i=0; i<fNTracker; i++){
     fGEMTracker[i]->Decode(evdata);
   }
@@ -231,8 +251,10 @@ THaAnalysisObject::EStatus SoLIDTrackerSystem::Init( const TDatime& date )
   if( status ){
   return fStatus = status;
   }
-  delete fTrackFinder;
-  fTrackFinder = new ProgressiveTracking(fNTracker, TestBit(kMCData));
+
+  fTrackFinder = new SoLKalTrackFinder(TestBit(kMCData), fNTracker);
+  fTrackFinder->SetGEMDetector(fGEMTracker);
+  fTrackFinder->SetECalDetector(fECal);
   
   return fStatus = kOK;
 }
@@ -246,14 +268,14 @@ Int_t SoLIDTrackerSystem::CoarseTrack( TClonesArray& /*tracks*/ )
   3. collect the output from the pattern recognition class, and fill the SoLIDTrack
      object (optional, may be done in the pattern recognition class) 
   */
-  static const char* const here = "SoLIDTrackerSystem::CoarseTrack";
+  //static const char* const here = "SoLIDTrackerSystem::CoarseTrack";
   
   //c++ map for storing pointers to the hit object array
   if ( TestBit(kDoCoarse) ){  
   fGoodSignalFlag = 0;
   Int_t signalCount[6] = {0}; //Temperory for checking
   
-  std::map<Int_t, std::vector<TSeqCollection*> > hitMap;
+  /*std::map<Int_t, std::vector<TSeqCollection*> > hitMap;
   for (Int_t i=0; i<fNTracker; i++){
     std::vector<TSeqCollection*> trackerHitArray;
     for (Int_t j=0; j<fGEMTracker[i]->GetNChamber(); j++){
@@ -266,9 +288,9 @@ Int_t SoLIDTrackerSystem::CoarseTrack( TClonesArray& /*tracks*/ )
       //-------------
     }
     hitMap.insert(std::pair<Int_t, vector<TSeqCollection*> >(i, trackerHitArray));
-  }
+  }*/
   
-  if (signalCount[0] == 1 && signalCount[1] ==1 && signalCount[2] == 1 && signalCount[3] == 1) fGoodSignalFlag = 1;
+  //if (signalCount[0] == 1 && signalCount[1] ==1 && signalCount[2] == 1 && signalCount[3] == 1) fGoodSignalFlag = 1;
   
   //check to see if there is any high energy hit on the calorimeters
   if ( fECal->IsLAECTriggered() ){
@@ -292,8 +314,18 @@ Int_t SoLIDTrackerSystem::CoarseTrack( TClonesArray& /*tracks*/ )
      
   }
   
+  //getting the Beam spot, using MC info for now
+#ifdef MCDATA
+  if( TestBit(kMCData) ) {
+    assert( dynamic_cast<MCTrack*>(fMCDecoder->GetMCTrack(0)) );
+    MCTrack* trk = static_cast<MCTrack*>( fMCDecoder->GetMCTrack(0) );
+    assert(trk);
+    fTrackFinder->SetBPM(trk->VX(), trk->VY());
+  }
+#endif
+  
   //this is where the actual pattern recognition done
-  fTrackFinder->ProcessHits(&hitMap, fTracks);
+  fTrackFinder->ProcessHits(fTracks);
   }
   return kOK;
 }
@@ -328,13 +360,41 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "track.3.y",       "y coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetHitY3()"         },
       { "track.4.y",       "y coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetHitY4()"         },
       { "track.5.y",       "y coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetHitY5()"         },
-      { "track.0.tracker", "tracker ID of the 1st hit",      "fTracks.SoLIDTrack.GetHitTracker0()"   },
-      { "track.1.tracker", "tracker ID of the 2nd hit",      "fTracks.SoLIDTrack.GetHitTracker1()"   },
-      { "track.2.tracker", "tracker ID of the 3rd hit",      "fTracks.SoLIDTrack.GetHitTracker2()"   },
-      { "track.3.tracker", "tracker ID of the 4th hit",      "fTracks.SoLIDTrack.GetHitTracker3()"   },
-      { "track.4.tracker", "tracker ID of the 5th hit",      "fTracks.SoLIDTrack.GetHitTracker4()"   },
-      { "track.5.tracker", "tracker ID of the 6th hit",      "fTracks.SoLIDTrack.GetHitTracker5()"   },
-      { "track.ntrack",    "number of tracks for the event", "GetNTracks()"                          },
+      { "track.0.predx",       "x coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHitX0()"         },
+      { "track.1.predx",       "x coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHitX1()"         },
+      { "track.2.predx",       "x coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHitX2()"         },
+      { "track.3.predx",       "x coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHitX3()"         },
+      { "track.4.predx",       "x coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHitX4()"         },
+      { "track.5.predx",       "x coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHitX5()"         },
+      { "track.0.predy",       "y coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHitY0()"         },
+      { "track.1.predy",       "y coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHitY1()"         },
+      { "track.2.predy",       "y coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHitY2()"         },
+      { "track.3.predy",       "y coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHitY3()"         },
+      { "track.4.predy",       "y coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHitY4()"         },
+      { "track.5.predy",       "y coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHitY5()"         },
+      { "track.0.predex",       "x coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHiteX0()"         },
+      { "track.1.predex",       "x coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHiteX1()"         },
+      { "track.2.predex",       "x coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHiteX2()"         },
+      { "track.3.predex",       "x coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHiteX3()"         },
+      { "track.4.predex",       "x coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHiteX4()"         },
+      { "track.5.predex",       "x coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHiteX5()"         },
+      { "track.0.predey",       "y coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHiteY0()"         },
+      { "track.1.predey",       "y coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHiteY1()"         },
+      { "track.2.predey",       "y coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHiteY2()"         },
+      { "track.3.predey",       "y coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHiteY3()"         },
+      { "track.4.predey",       "y coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHiteY4()"         },
+      { "track.5.predey",       "y coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHiteY5()"         },
+      { "track.0.tracker",      "tracker ID of the 1st hit",      "fTracks.SoLIDTrack.GetHitTracker0()"   },
+      { "track.1.tracker",      "tracker ID of the 2nd hit",      "fTracks.SoLIDTrack.GetHitTracker1()"   },
+      { "track.2.tracker",      "tracker ID of the 3rd hit",      "fTracks.SoLIDTrack.GetHitTracker2()"   },
+      { "track.3.tracker",      "tracker ID of the 4th hit",      "fTracks.SoLIDTrack.GetHitTracker3()"   },
+      { "track.4.tracker",      "tracker ID of the 5th hit",      "fTracks.SoLIDTrack.GetHitTracker4()"   },
+      { "track.5.tracker",      "tracker ID of the 6th hit",      "fTracks.SoLIDTrack.GetHitTracker5()"   },
+      { "track.ntrack",         "number of tracks for the event", "GetNTracks()"                          },
+      { "track.p",              "momentum of the track",          "fTracks.SoLIDTrack.GetMomentum()"},
+      { "track.theta",          "polar angle of the track",       "fTracks.SoLIDTrack.GetTheta()"},
+      { "track.phi",            "azimuthal angle of the track",   "fTracks.SoLIDTrack.GetPhi()"},
+      { "track.vertexz",        "vertex z of the track",          "fTracks.SoLIDTrack.GetVertexZ()"},
       { 0 }   
     };
     ret = DefineVarsFromList( nonmcvars, mode );
@@ -354,6 +414,48 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "track.3.y",       "y coordinate of the 4th hit",    "fTracks.SoLIDMCTrack.GetHitY3()"         },
       { "track.4.y",       "y coordinate of the 5th hit",    "fTracks.SoLIDMCTrack.GetHitY4()"         },
       { "track.5.y",       "y coordinate of the 6th hit",    "fTracks.SoLIDMCTrack.GetHitY5()"         },
+      { "track.0.px",       "x coordinate of the 1st hit",    "fTracks.SoLIDMCTrack.GetHitPX0()"         },
+      { "track.1.px",       "x coordinate of the 2nd hit",    "fTracks.SoLIDMCTrack.GetHitPX1()"         },
+      { "track.2.px",       "x coordinate of the 3rd hit",    "fTracks.SoLIDMCTrack.GetHitPX2()"         },
+      { "track.3.px",       "x coordinate of the 4th hit",    "fTracks.SoLIDMCTrack.GetHitPX3()"         },
+      { "track.4.px",       "x coordinate of the 5th hit",    "fTracks.SoLIDMCTrack.GetHitPX4()"         },
+      { "track.5.px",       "x coordinate of the 6th hit",    "fTracks.SoLIDMCTrack.GetHitPX5()"         },
+      { "track.0.py",       "y coordinate of the 1st hit",    "fTracks.SoLIDMCTrack.GetHitPY0()"         },
+      { "track.1.py",       "y coordinate of the 2nd hit",    "fTracks.SoLIDMCTrack.GetHitPY1()"         },
+      { "track.2.py",       "y coordinate of the 3rd hit",    "fTracks.SoLIDMCTrack.GetHitPY2()"         },
+      { "track.3.py",       "y coordinate of the 4th hit",    "fTracks.SoLIDMCTrack.GetHitPY3()"         },
+      { "track.4.py",       "y coordinate of the 5th hit",    "fTracks.SoLIDMCTrack.GetHitPY4()"         },
+      { "track.5.py",       "y coordinate of the 6th hit",    "fTracks.SoLIDMCTrack.GetHitPY5()"         },
+      { "track.0.pz",       "z coordinate of the 1st hit",    "fTracks.SoLIDMCTrack.GetHitPZ0()"         },
+      { "track.1.pz",       "z coordinate of the 2nd hit",    "fTracks.SoLIDMCTrack.GetHitPZ1()"         },
+      { "track.2.pz",       "z coordinate of the 3rd hit",    "fTracks.SoLIDMCTrack.GetHitPZ2()"         },
+      { "track.3.pz",       "z coordinate of the 4th hit",    "fTracks.SoLIDMCTrack.GetHitPZ3()"         },
+      { "track.4.pz",       "z coordinate of the 5th hit",    "fTracks.SoLIDMCTrack.GetHitPZ4()"         },
+      { "track.5.pz",       "z coordinate of the 6th hit",    "fTracks.SoLIDMCTrack.GetHitPZ5()"         },
+      { "track.0.predx",       "x coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHitX0()"         },
+      { "track.1.predx",       "x coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHitX1()"         },
+      { "track.2.predx",       "x coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHitX2()"         },
+      { "track.3.predx",       "x coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHitX3()"         },
+      { "track.4.predx",       "x coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHitX4()"         },
+      { "track.5.predx",       "x coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHitX5()"         },
+      { "track.0.predy",       "y coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHitY0()"         },
+      { "track.1.predy",       "y coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHitY1()"         },
+      { "track.2.predy",       "y coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHitY2()"         },
+      { "track.3.predy",       "y coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHitY3()"         },
+      { "track.4.predy",       "y coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHitY4()"         },
+      { "track.5.predy",       "y coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHitY5()"         },
+      { "track.0.predex",       "x coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHiteX0()"         },
+      { "track.1.predex",       "x coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHiteX1()"         },
+      { "track.2.predex",       "x coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHiteX2()"         },
+      { "track.3.predex",       "x coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHiteX3()"         },
+      { "track.4.predex",       "x coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHiteX4()"         },
+      { "track.5.predex",       "x coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHiteX5()"         },
+      { "track.0.predey",       "y coordinate of the 1st hit",    "fTracks.SoLIDTrack.GetPredHiteY0()"         },
+      { "track.1.predey",       "y coordinate of the 2nd hit",    "fTracks.SoLIDTrack.GetPredHiteY1()"         },
+      { "track.2.predey",       "y coordinate of the 3rd hit",    "fTracks.SoLIDTrack.GetPredHiteY2()"         },
+      { "track.3.predey",       "y coordinate of the 4th hit",    "fTracks.SoLIDTrack.GetPredHiteY3()"         },
+      { "track.4.predey",       "y coordinate of the 5th hit",    "fTracks.SoLIDTrack.GetPredHiteY4()"         },
+      { "track.5.predey",       "y coordinate of the 6th hit",    "fTracks.SoLIDTrack.GetPredHiteY5()"         },
       { "track.0.tracker", "tracker ID of the 1st hit",      "fTracks.SoLIDMCTrack.GetHitTracker0()"   },
       { "track.1.tracker", "tracker ID of the 2nd hit",      "fTracks.SoLIDMCTrack.GetHitTracker1()"   },
       { "track.2.tracker", "tracker ID of the 3rd hit",      "fTracks.SoLIDMCTrack.GetHitTracker2()"   },
@@ -370,6 +472,17 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "track.nhits",     "number of hits of the track",    "fTracks.SoLIDMCTrack.GetNHits()"       },
       { "track.ntrack",    "number of tracks for the event", "GetNTracks()"                          },
       { "track.goodsignal","1 if all GEMs have one hit from the signal", "fGoodSignalFlag"           },
+      { "track.nseeds",    "number of seeds for tracking",   "GetNSeeds()"},
+      { "track.seedeffi",  "efficiency of seeding",          "GetSeedEfficiency()"},
+      { "track.trackeffi",  "efficiency of seeding",          "GetMCTrackEfficiency()"},
+      { "track.chi2perndf", "chi2 per ndf",                  "fTracks.SoLIDMCTrack.GetChi2()"},
+      { "track.p",              "momentum of the track",          "fTracks.SoLIDTrack.GetMomentum()"},
+      { "track.theta",          "polar angle of the track",       "fTracks.SoLIDTrack.GetTheta()"},
+      { "track.phi",            "azimuthal angle of the track",   "fTracks.SoLIDTrack.GetPhi()"},
+      { "track.vertexz",        "vertex z of the track",          "fTracks.SoLIDTrack.GetVertexZ()"},
+      { "track.deltaecx",        "delta x ec",          "fTracks.SoLIDTrack.GetMomMax()"},
+      { "track.deltaecy",        "delta y ec",          "fTracks.SoLIDTrack.GetMomMin()"},
+      { "track.deltaece",        "delta E ec in %",          "fTracks.SoLIDTrack.GetThetaMin()"}, 
       { 0 }
     };
     ret = DefineVarsFromList( mcvars, mode );

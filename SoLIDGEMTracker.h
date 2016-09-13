@@ -28,12 +28,18 @@ class SoLIDGEMTracker : public THaSubDetector{
   void              SetTrackerID(Int_t i) { fTrackerID = i; }
   Int_t             GetTrackerID() const { return fTrackerID; }
   Int_t             GetNChamber() const { return fNChamber; }
-  Double_t          GetZ() const { return fTrackerZ; }
+  Double_t&         GetZ()  { return fTrackerZ; }
   Int_t             CombineChamberHits();
   SoLIDGEMChamber * GetChamber(Int_t i) const {
     if (i >= 0 && i < fNChamber){ return fGEMChamber[i]; }
     else { return 0; }
   }
+  Int_t             GetNHits() const { return fNHits; }
+  
+  Double_t GetUMeanOccu();
+  Double_t GetUMeanHitOccu();
+  Double_t GetVMeanOccu();
+  Double_t GetVMeanHitOccu();
   
   protected:
   virtual Int_t     ReadDatabase( const TDatime& date );
@@ -47,6 +53,7 @@ class SoLIDGEMTracker : public THaSubDetector{
   Int_t             fTrackerID;   //GEM ID, 0~5 for SIDIS, 0~4 for PVDIS
   TClonesArray*     fHits;   
   std::vector<SoLIDGEMChamber*> fGEMChamber;
+  Int_t             fNHits;
   ClassDef(SoLIDGEMTracker,0)  // One Tracker plane coordinate direction
 };
 #endif

@@ -1,3 +1,5 @@
+//c++
+#include <algorithm>
 //SoLIDTracking
 #include "SoLIDTrack.h"
 
@@ -68,10 +70,41 @@ Double_t SoLIDTrack::GetHitInfo(UInt_t i, UInt_t type) const
   else if (type == 6){ //the chamber ID of the ith hit
     return fHits.at(i)->GetChamberID();
   }
+  else if (type == 7){
+    return fHits.at(i)->GetPredX();
+  }
+  else if (type == 8){
+    return fHits.at(i)->GetPredY();
+  }
+  else if (type == 9){
+    return fHits.at(i)->GetPredeX();
+  }
+  else if (type == 10){
+    return fHits.at(i)->GetPredeY();
+  }
+   else if (type == 11){
+    return fHits.at(i)->GetPX();
+  }
+  else if (type == 12){
+    return fHits.at(i)->GetPY();
+  }
+  else if (type == 13){
+    return fHits.at(i)->GetPZ();
+  }
+
   else { return 0; }
   
 }
-
+//____________________________________________________________________
+bool SoLIDTrack::SortHitZ(const SoLIDGEMHit* a, const SoLIDGEMHit* b)
+{
+  return a->GetZ() < b->GetZ();
+}
+//____________________________________________________________________
+void SoLIDTrack::SortHits()
+{
+  sort(fHits.begin(), fHits.end(), SortHitZ);
+}
 //----------------------SoLIDMCTrack--------------------------------//
 //__________________________________________________________________
 #ifdef MCDATA
