@@ -47,8 +47,8 @@ Int_t SoLIDTrack::Compare( const TObject* obj ) const
 //________________________________________________________________
 Double_t SoLIDTrack::GetHitInfo(UInt_t i, UInt_t type) const
 {
-  while (i>= fHits.size()) { i -= fHits.size(); } 
-  
+  if (i>= fHits.size()) { i = fHits.size()-1; }
+
   if (type == 0){ //x coordinate info for the ith hit
     return fHits.at(i)->GetX();
   }
@@ -91,6 +91,9 @@ Double_t SoLIDTrack::GetHitInfo(UInt_t i, UInt_t type) const
   else if (type == 13){
     return fHits.at(i)->GetPZ();
   }
+  else if (type == 14){
+  	return fHits.at(i)->GetDeltaChi2();
+  } 
 
   else { return 0; }
   

@@ -20,7 +20,7 @@ SoLIDGEMChamber::SoLIDGEMChamber(Int_t ichamber, const char* name, const char* d
   static const char* const here = "SoLIDGEMChamber";
   assert( name && parent );
   fParentTrackerID = dynamic_cast<SoLIDGEMTracker*>(GetParent())->GetTrackerID();
-  assert( dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector()) );  
+  assert( dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector()) );
   try {
 #ifdef MCDATA
     if( dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->TestBit(SoLIDTrackerSystem::kMCData) )
@@ -35,7 +35,7 @@ SoLIDGEMChamber::SoLIDGEMChamber(Int_t ichamber, const char* name, const char* d
     MakeZombie();
     return;
   }
-  
+
 }
 //_________________________________________________________________________________________
 SoLIDGEMChamber::~SoLIDGEMChamber()
@@ -43,8 +43,9 @@ SoLIDGEMChamber::~SoLIDGEMChamber()
   if( fIsSetup )
     RemoveVariables();
   DeleteContainer(fGEMReadOut);
-  
+
   delete fHits;
+  //delete fAcceptHist;
 }
 //_________________________________________________________________________________________
 void SoLIDGEMChamber::Clear( Option_t* opt)
@@ -69,7 +70,7 @@ Int_t SoLIDGEMChamber::Decode( const THaEvData& evdata)
   for (Int_t i=0; i<fNReadOut; i++){
     fGEMReadOut[i]->Decode(evdata);
   }
-  
+
   for (Int_t i=0; i<fNReadOut; i++){
     //skip the very noisy event, will slow down the spped a lot. Not worth it.
     if ( fGEMReadOut[i]->IsNoisyEvent() == 1 ){
@@ -80,14 +81,14 @@ Int_t SoLIDGEMChamber::Decode( const THaEvData& evdata)
     }
   }
   if (!fDo3DAmCorr) return 0; //not going to do 3d amplitude matching here, if requested
-  
+
   assert(fNReadOut == 2);//again, require 2D readout
-  
+
   TSeqCollection* uhits = fGEMReadOut[0]->GetHits();
   TSeqCollection* vhits = fGEMReadOut[1]->GetHits();
   assert(uhits && vhits);
   Int_t nHit = ProcessRawHits(uhits, vhits);
-  
+
   fUOccupancy = fGEMReadOut[0]->GetOccupancy();
   fVOccupancy = fGEMReadOut[1]->GetOccupancy();
   fUHitOccupancy = fGEMReadOut[0]->GetHitOccupancy();
@@ -158,12 +159,12 @@ void SoLIDGEMChamber::PrintDataBase(Int_t level) const
   }
 } 
 //_________________________________________________________________________________________
-Int_t SoLIDGEMChamber::Begin( THaRunBase* r )
+Int_t SoLIDGEMChamber::Begin( THaRunBase* /*r*/ )
 {
   return 0;
 }
 //_________________________________________________________________________________________
-Int_t SoLIDGEMChamber::End( THaRunBase* r )
+Int_t SoLIDGEMChamber::End( THaRunBase* /*r*/ )
 {
   return 0;
 }
@@ -191,11 +192,11 @@ Int_t SoLIDGEMChamber::ReadDatabase( const TDatime& date )
       };
 
   Int_t status = LoadDB( file, date, request, fPrefix );
-  
-  assert(fDo3DAmCorr >=0 && f3DAmCorrCut >=0 && fNReadOut >0 ); 
-  
+
+  assert(fDo3DAmCorr >=0 && f3DAmCorrCut >=0 && fNReadOut >0 );
+
   if (status != kOK) { return status; }
-  
+
   fIsInit = kTRUE;
   return fStatus = kOK;
 }
@@ -210,15 +211,17 @@ Int_t SoLIDGEMChamber::ReadGeometry( FILE* file, const TDatime& date,
   fRMin = -1.;
   fRMax = -1.;
   vector<Double_t>* reference = 0;
+  string fileName = "";
   try{
     reference = new vector<Double_t>;
     const DBRequest request[] = {
-          { "rmin",           &fRMin,            kDouble,  0, 1 },
-          { "rmax",           &fRMax,            kDouble,  0, 1 },
-          { "dz",             &fDz,              kDouble,  0, 1 },
-          { "phi",            &fPhi,             kDouble,  0, 1 },
-          { "phi_cover",      &fPhiCover,        kDouble,  0, 1 },
-          { "phi_offset",     &fPhiOffset,       kDouble,  0, 1 },
+          { "rmin",           &fRMin,            kDouble,  0, 0 },
+          { "rmax",           &fRMax,            kDouble,  0, 0 },
+          { "dz",             &fDz,              kDouble,  0, 0 },
+          { "phi",            &fPhi,             kDouble,  0, 0 },
+          { "phi_cover",      &fPhiCover,        kDouble,  0, 0 },
+          { "phi_offset",     &fPhiOffset,       kDouble,  0, 0 },
+          { "acc_file_name",  &fileName,         kString,  0, 1 },
           { "reference",       reference,        kDoubleV},
           { 0 }
       };
@@ -258,51 +261,62 @@ Int_t SoLIDGEMChamber::ReadGeometry( FILE* file, const TDatime& date,
   }
 
   //change all the angles from deg to rad and keep them in -pi to pi for consistancy
-  
+
   fPhi = TVector2::Phi_mpi_pi( fPhi*TMath::DegToRad() );
   fPhiCover = TVector2::Phi_mpi_pi( fPhiCover*TMath::DegToRad() );
   fPhiOffset = TVector2::Phi_mpi_pi( fPhiOffset*TMath::DegToRad() );
-  fPhiInLab = fPhi + fPhiOffset + dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->GetPhi();
+  //phi offset is something we want to minus, if notice there is a constant shift in phi, this is
+  //likely the cause
+  fPhiInLab = fPhi - fPhiOffset + dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->GetPhi();
   fPhiInLab = TVector2::Phi_mpi_pi(fPhiInLab);
-  
+
   Double_t phi2 = 0.5*fPhiCover;
-  fPhiMin = -phi2 + fPhiOffset;
-  fPhiMax =  phi2 + fPhiOffset;
+  fPhiMin = -phi2 - fPhiOffset;
+  fPhiMax =  phi2 - fPhiOffset;
   assert( fPhiMin < fPhiMax );
   assert( fPhiMin > -TMath::PiOver2() );
   assert( fPhiMax < TMath::PiOver2() );
-  
+
   // Define the origin of the plane in the same way as in libsolgem: It is
   // the center of the bounding box of the ring segment, calculated WITHOUT
   // any phi offset rotation.
-  // Notice that this is no longer true if the chamber is shifted inward in 
+  // Notice that this is no longer true if the chamber is shifted inward in
   // the radial direction. Phi angle coverage is ill-defined know. But, it can
   // still work in this way if we define a reference point, at which the lines
-  // that are parallel to the longer edge of the chamber intersect. 
-  // this info is stored in fReference TVector2. One will need to define this 
+  // that are parallel to the longer edge of the chamber intersect.
+  // this info is stored in fReference TVector2. One will need to define this
   // point in the data base, since I don't know how much it will be shifted inward here
-  
+
   Double_t xmin = fRMin * TMath::Cos(phi2), xmax = fRMax;
-  Double_t r_shift = TMath::Sqrt(fReference.X()*fReference.X() + 
+  Double_t r_shift = TMath::Sqrt(fReference.X()*fReference.X() +
                                  fReference.Y()*fReference.Y() );
   //TODO: test this later on when there is really a reference, not is (0,0)
-  fOrigin.SetXYZ( 0.5*(xmin+xmax) - r_shift, 0.0, 
-                  dynamic_cast<SoLIDGEMTracker*>(GetParent())->GetZ() + fDz); 
-  
+  fOrigin.SetXYZ( 0.5*(xmin+xmax) - r_shift, 0.0,
+                  dynamic_cast<SoLIDGEMTracker*>(GetParent())->GetZ() + fDz);
+  fChamberCenter = fOrigin;
+
   if( fPhiOffset != 0.0 ) {
   //TODO:think if we want to do all the rotations here once and for all, or we break it down
   //at different level?
-  
-    //fOrigin.RotateZ(dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->GetPhi() + 
-    //                fPhi+fPhiOffset);
+
+    fOrigin.RotateZ(dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->GetPhi() +
+                    fPhi-fPhiOffset);
   }
-  
+
   //just to compare the raw decode result in TreeSearch, we set all the chamber origin relative
   //to the first chamber in the first GEM tracker plane, will delete this later
-  //fOrigin.SetXYZ(fOrigin.X() - 0.847503, fOrigin.Y() + 0.0518355, fOrigin.Z());
-  fOrigin.SetXYZ(fOrigin.X(), fOrigin.Y(), fOrigin.Z());
+  //fOrigin.SetXYZ(fOrigin.X(), fOrigin.Y(), fOrigin.Z());
+  fAcceptHist = NULL;
+  if (!fileName.empty()){
+    TFile* thisFile = new TFile(fileName.c_str(), "READ");
+    if (thisFile->IsOpen()){
+        fAcceptHist = (TH2F*)((thisFile->Get(Form("hit_position_plane_%d", 
+                  dynamic_cast<SoLIDGEMTracker*>(GetParent())->GetTrackerID())))->Clone() );
+    }
+  //thisFile->Close();
+  }
   return kOK;
-  
+
 
 }
 //________________________________________________________________________________________
@@ -311,7 +325,7 @@ Int_t SoLIDGEMChamber::DefineVariables(EMode mode)
   // initialize global variables
   if( mode == kDefine && fIsSetup ) return kOK;
   fIsSetup = ( mode == kDefine );
-  
+
   // Register variables in global list
   Int_t ret;
 #ifdef MCDATA
@@ -325,7 +339,7 @@ Int_t SoLIDGEMChamber::DefineVariables(EMode mode)
       { "hit2D.r",       "2D hit r coordinate",          "fHits.SoLIDGEMHit.GetR()"         },
       { "hit2D.phi",     "2D hit phi coordinate",        "fHits.SoLIDGEMHit.GetPhi()"       },
       { "hit2D.chamber", "2D hit chamber ID",            "fHits.SoLIDGEMHit.GetChamberID()" },
-      { 0 }   
+      { 0 }
     };
     ret = DefineVarsFromList( nonmcvars, mode );
   }else{
@@ -354,12 +368,14 @@ Int_t SoLIDGEMChamber::ProcessRawHits(TSeqCollection* uhits, TSeqCollection* vhi
   Bool_t mc_data = dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->TestBit(SoLIDTrackerSystem::kMCData);
   TIterator* uit = uhits->MakeIterator();
   TIterator* vit = vhits->MakeIterator();
-  
-  Hit* auhit = 0;
-  Hit* avhit = 0;
-  while( (auhit = static_cast<Hit*>(uit->Next()) ) ) {
-  vit -> Reset();
-    while( (avhit = static_cast<Hit*>(vit->Next()) ) ){
+
+  SoLIDRawHit* auhit = 0;
+  SoLIDRawHit* avhit = 0;
+  while( (auhit = static_cast<SoLIDRawHit*>(uit->Next()) ) ) {
+    if (!auhit->GetStatus()) continue;
+    vit -> Reset();
+    while( (avhit = static_cast<SoLIDRawHit*>(vit->Next()) ) ){
+      if (!avhit->GetStatus()) continue;
       Double_t r = 0;
       Double_t phi = 0;
       UVtoCylinCoor(auhit->GetPos(), avhit->GetPos(), &r, &phi);
@@ -373,36 +389,62 @@ Int_t SoLIDGEMChamber::ProcessRawHits(TSeqCollection* uhits, TSeqCollection* vhi
           else{
             new ( (*fHits)[nHit++]) SoLIDMCGEMHit( fChamberID, fParentTrackerID, r, phi, GetZ(), auhit, avhit);
           }
-#endif   
+#endif
       }
     }
   }
   //sort the hit array now from small radius to large radius
-  fHits->Sort(); 
+  fHits->Sort();
   return nHit;
 }
 //____________________________________________________________________________________________
 inline void SoLIDGEMChamber::UVtoCylinCoor(Double_t upos, Double_t vpos, Double_t* r, Double_t* phi)
 {
-  
-  assert(fNReadOut == 2); 
+
+  assert(fNReadOut == 2);
   Double_t su = fGEMReadOut[0]->GetSinStripAngle();
   Double_t sv = fGEMReadOut[1]->GetSinStripAngle();
   Double_t cu = fGEMReadOut[0]->GetCosStripAngle();
   Double_t cv = fGEMReadOut[1]->GetCosStripAngle();
   Double_t ba = sv*cu-su*cv;
-  
+
   Double_t x = (upos*sv - vpos*su)/ba;
   Double_t y = (vpos*cu - upos*cv)/ba;
   
+  if (fAcceptHist != NULL){
+    int inx = fAcceptHist->GetXaxis()->FindBin(x);
+    int iny = fAcceptHist->GetYaxis()->FindBin(y);
+    if ( fAcceptHist->GetBinContent(inx, iny) < 1.e-6 ){
+        *r = 0.;
+        *phi = 0.;
+        return;
+    }
+  }
+
   *r = TMath::Sqrt(x*x + y*y);
   *phi = TMath::ATan2(y, x); //this is in a frame where center of the symmetric axis of the chamber is
                              //the same as x axis
 }
 //____________________________________________________________________________________________
+Bool_t SoLIDGEMChamber::CartesianToUV(Double_t &x, Double_t &y, Double_t &u, Double_t &v)
+{
+  Double_t r = sqrt(x*x + y*y);
+  Double_t phi = TMath::ATan2(y,x);
+  RotateToChamber(&phi);
+  if (!Contains(&r, &phi)) return false;
+  
+  Double_t chamberX = r*cos(phi);
+  Double_t chamberY = r*sin(phi);
+  
+  u = chamberX*fGEMReadOut[0]->GetCosStripAngle() + chamberY*fGEMReadOut[0]->GetSinStripAngle();
+  v = chamberX*fGEMReadOut[1]->GetCosStripAngle() + chamberY*fGEMReadOut[1]->GetSinStripAngle();
+  
+  return true;
+}
+//____________________________________________________________________________________________
 inline Bool_t SoLIDGEMChamber::Contains(Double_t* r, Double_t *phi)
 {
-  if ( (*r <= fRMax && *r >= fRMin ) && ( *phi <= fPhiCover/2. 
+  if ( (*r <= fRMax && *r >= fRMin ) && ( *phi <= fPhiCover/2.
         && *phi >= -fPhiCover/2. ) ){ return kTRUE; }
   else { return kFALSE; }
 }
@@ -413,9 +455,15 @@ inline Bool_t SoLIDGEMChamber::CheckChargeAsymmetry(Double_t qu, Double_t qv)
   else return kFALSE;
 }
 //____________________________________________________________________________________________
-inline void SoLIDGEMChamber::RotateToLab(Double_t *phi)
+inline void SoLIDGEMChamber::RotateToLab(Double_t* phi)
 {
-  *phi += fPhiInLab; 
+  *phi += fPhiInLab;
+  *phi = TVector2::Phi_mpi_pi(*phi);
+}
+//____________________________________________________________________________________________
+inline void SoLIDGEMChamber::RotateToChamber(Double_t* phi)
+{
+  *phi -= fPhiInLab;
   *phi = TVector2::Phi_mpi_pi(*phi);
 }
 

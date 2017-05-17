@@ -8,8 +8,8 @@ SoLKalTrackSystem *SoLKalTrackSystem::fgCurInstancePtr = 0;
 SoLKalTrackSystem::SoLKalTrackSystem(Int_t n)
             :TObjArray(n),
              fCurSitePtr(0),
-             fChi2(0.), fIsGood(kTRUE), fNMissingHits(0), 
-             fNHits(-1), fNDF(0), fSeedType(kTriplet)
+             fIsGood(kTRUE), fNMissingHits(0), 
+             fNHits(-1), fNDF(0), fSeedType(kTriplet), fChi2(0.)
 {
 }
 //___________________________________________________________________
@@ -58,6 +58,22 @@ Int_t SoLKalTrackSystem::GetNDF(Bool_t self) const
    }
    if (self) ndf -= kSdim;
    return ndf;
+}
+//_____________________________________________________________________
+void SoLKalTrackSystem::UpdateChi2()
+{
+    fChi2 = 0.;
+    for (Int_t isite=1; isite<GetEntries(); isite++) {
+       SoLKalTrackSite &site = *static_cast<SoLKalTrackSite *>(At(isite));
+       /*if (!site.IsVirtualSite())*/
+       fChi2 += site.GetDeltaChi2();
+    }
+}
+//_____________________________________________________________________
+Double_t SoLKalTrackSystem::GetChi2perNDF() const
+{
+    if (fNDF <= 0) return 0;
+    else return GetChi2()/fNDF;
 }
 //_____________________________________________________________________
 void SoLKalTrackSystem::SmoothBackTo(Int_t k)
@@ -137,17 +153,22 @@ void SoLKalTrackSystem::CheckTrackStatus()
     {
       fIsGood = kFALSE;
     }
-    else if ( mom > 100. || mom < 0. ){
-      //cerr<<"SoLKalTrackSystem::CheckTrackStatus: momentum of the track is out of bound. Momentum: "<<mom<<endl;
+    else if ( mom > 20. || mom < 0. ){
       fIsGood = kFALSE;
     }
     else if (theta > 40. ){
-      cout<<"theta angle too large"<<endl;
       fIsGood = kFALSE;
     }
+#ifdef SIDIS
     else if (fNMissingHits > 1){
       fIsGood = kFALSE;
     }
+#endif
+#ifdef PVDIS
+     else if (fNMissingHits > 1){
+      fIsGood = kFALSE;
+    }
+#endif
 }
 //__________________________________________________________________________
 Int_t SoLKalTrackSystem::Compare( const TObject* obj ) const

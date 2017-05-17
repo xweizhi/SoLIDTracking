@@ -26,12 +26,11 @@ class SoLKalTrackSystem : public TObjArray {
   inline SoLKalTrackSite  & GetCurSite() { return *fCurSitePtr; }
   inline SoLKalTrackState & GetState(SoLKalTrackSite::EStType t)
                             { return fCurSitePtr->GetState(t); }
-  inline Double_t GetChi2() { return fChi2; }
+  void   UpdateChi2();
+  Double_t GetChi2() const {return fChi2; };
   void IncreaseChi2(Double_t dchi2) { fChi2 += dchi2; } 
   Int_t    GetNDF (Bool_t self = kTRUE) const;
-  Double_t GetChi2perNDF() const {
-           if (fNDF <= 0) return 0; 
-           else return fChi2/fNDF; }
+  Double_t GetChi2perNDF() const;
 
   static  SoLKalTrackSystem *GetCurInstancePtr() { return fgCurInstancePtr; }
   void SetCurInstancePtr(SoLKalTrackSystem *ksp) { fgCurInstancePtr = ksp; }
@@ -74,7 +73,6 @@ class SoLKalTrackSystem : public TObjArray {
   private:
   SoLKalTrackSite   *fCurSitePtr;  // pointer to current site
   
-  Double_t     fChi2;        // current total chi2
   
   static SoLKalTrackSystem *fgCurInstancePtr;  //! currently active instance
 
@@ -91,6 +89,8 @@ class SoLKalTrackSystem : public TObjArray {
   Double_t     fPhi;
   Double_t     fVertexZ;
   SeedType     fSeedType;
+  
+  Double_t     fChi2;
        
   
   ClassDef(SoLKalTrackSystem,1)  // Base class for Kalman Filter

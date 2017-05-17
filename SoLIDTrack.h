@@ -35,6 +35,13 @@ class SoLIDTrack : public TObject
   void         SetTheta(Double_t theta)      { fTheta = theta; }
   void         SetPhi(Double_t phi)          { fPhi = phi; } 
   void         SetNDF(Int_t ndf)             { fNDF = ndf; }
+  
+  void         SetBackTheta(Double_t theta)  { fBackTheta = theta; }
+  void         SetBackPhi(Double_t phi)      { fBackPhi = phi; }
+  void         SetBackX(Double_t x)          { fBackX = x; }
+  void         SetBackY(Double_t y)          { fBackY = y; }
+  void         SetBackMom(Double_t mom)      { fBackMom = mom; }
+  
  
   Bool_t       IsCoarseFitted()        const { return fIsCoarseFitted; }
   Bool_t       IsFineFitted()          const { return fIsFineFitted; }
@@ -132,7 +139,20 @@ class SoLIDTrack : public TObject
   Double_t     GetHitPZ3()              const { return GetHitInfo(3, 13); }
   Double_t     GetHitPZ4()              const { return GetHitInfo(4, 13); }
   Double_t     GetHitPZ5()              const { return GetHitInfo(5, 13); }
+  
+  Double_t     GetHit0Chi2()             const { return GetHitInfo(0, 14); }
+  Double_t     GetHit1Chi2()             const { return GetHitInfo(1, 14); }
+  Double_t     GetHit2Chi2()             const { return GetHitInfo(2, 14); }
+  Double_t     GetHit3Chi2()             const { return GetHitInfo(3, 14); }
+  Double_t     GetHit4Chi2()             const { return GetHitInfo(4, 14); }
+  Double_t     GetHit5Chi2()             const { return GetHitInfo(5, 14); }
 
+  Double_t     GetBackTheta()           const { return fBackTheta; }
+  Double_t     GetBackPhi()             const { return fBackPhi; }
+  Double_t     GetBackX()               const { return fBackX; }
+  Double_t     GetBackY()               const { return fBackY; }
+  Double_t     GetBackMom()             const { return fBackMom; }
+  
   
   static bool SortHitZ(const SoLIDGEMHit* a, const SoLIDGEMHit* b);
   void SortHits();
@@ -155,6 +175,14 @@ class SoLIDTrack : public TObject
   Double_t fTheta;
   Double_t fPhi;
   Int_t fNDF;
+  
+  //back track info
+  Double_t fBackTheta;
+  Double_t fBackPhi;
+  Double_t fBackX;
+  Double_t fBackY;
+  Double_t fBackMom;
+  
   std::vector<SoLIDGEMHit*> fHits;
   
   ClassDef(SoLIDTrack, 1)

@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
+//ROOt
+#include "TMath.h"
 //SoLIDTracking
 #include "SoLKalTrackSite.h"
 ClassImp(SoLKalTrackSite)
@@ -21,8 +23,13 @@ SoLKalTrackSite::SoLKalTrackSite(SoLIDGEMHit *ht, Int_t m, Int_t  p, Double_t ch
   fM(kIdxX0, 0) = ht->GetX(); 
   fM(kIdxY0, 0) = ht->GetY();
   Double_t phi = atan2(ht->GetY(), ht->GetX());
-  Double_t dr = 4.e-4;
-  Double_t drphi = 4.5e-5;
+  Double_t uReso = ht->GetUHit()->GetResolution();
+  Double_t vReso = ht->GetVHit()->GetResolution();
+  Double_t mean = (uReso + vReso)/2.;
+  
+  Double_t dr = mean/sin(6./180.*TMath::Pi())/sqrt(2.);
+  
+  Double_t drphi = mean/cos(6./180.*TMath::Pi())/sqrt(2.);
   
   Double_t dx = sqrt( pow( cos(phi)*dr, 2) + pow( sin(phi)*drphi, 2) );
   Double_t dy = sqrt( pow( sin(phi)*dr, 2) + pow( cos(phi)*drphi, 2) );
@@ -256,6 +263,8 @@ SoLIDGEMHit* SoLKalTrackSite::GetPredInfoHit()
   tmp.SetX(a(kIdxTX, 0) * tmp.Z());
   tmp.SetY(a(kIdxTY, 0) * tmp.Z());
   tmp = tmp.Unit();
+
+  fGEMHit->SetDeltaChi2(fDeltaChi2);
 
   fGEMHit->SetMomentum(momentum*tmp.X(), momentum*tmp.Y(), momentum*tmp.Z());
  

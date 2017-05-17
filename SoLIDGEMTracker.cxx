@@ -3,6 +3,11 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <cmath>
+
+//ROOT
+#include "TVector2.h"
+
 //SoLID Tracking
 #include "SoLIDGEMTracker.h"
 #include "SoLIDTrackerSystem.h" 
@@ -60,7 +65,86 @@ Int_t SoLIDGEMTracker::Decode( const THaEvData& evdata)
   for (Int_t i=0; i<fNChamber; i++){
     fGEMChamber[i]->Decode(evdata);
   }
-  if (fDoCombineHits) fNHits = CombineChamberHits();
+  //if (!fDoCombineHits) return 0; //fNHits = CombineChamberHits();
+  
+  fNHits = 0;
+  for (Int_t i=0; i<fNChamber; i++){
+    TSeqCollection* hits = fGEMChamber[i]->GetHits();
+    fNHits +=  hits->GetEntries();
+  }
+  
+
+#ifdef MCDATA
+  Int_t nHit = 0;
+  Int_t countMC = 0;
+  
+  fMCDecoder = dynamic_cast<const Podd::SimDecoder*>(&evdata);
+  
+  if (dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector())->TestBit(SoLIDTrackerSystem::kMCData)){
+    for (Int_t i = 0; i < fMCDecoder->GetNMCPoints(); i++){
+      Podd::MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
+      if (pt->fPlane != fTrackerID) continue; //not from this tracker
+      if (pt->fType != 0) continue;
+      countMC++;
+      Double_t mcX = (pt->fMCPoint).X();
+      Double_t mcY = (pt->fMCPoint).Y();
+      
+      //cout<<fTrackerID<<" "<< (pt->fMCPoint).X()<<" "<<(pt->fMCPoint).Y()<<" "<<(pt->fMCPoint).Z()<<" "<<pt->fType<<endl; 
+      //find which chamber the MC hit belongs to
+      Double_t phi = atan2( mcY, mcX );
+      Int_t chamberList[3] = {-1, -1, -1};
+      //for PVDIS there is no need to search for neighboring chamber
+      Int_t searchChamber = 3 < fNChamber ? 3 : 1 ;
+      
+      for (Int_t j=0; j<fNChamber; j++){
+        Double_t dphi = phi - fGEMChamber[j]->GetPhiInLab();
+        dphi = TVector2::Phi_mpi_pi(dphi);
+        if ( dphi < fGEMChamber[j]->GetPhiCover()/2. && dphi > -1*fGEMChamber[j]->GetPhiCover()/2.){
+          for (Int_t k=0; k<3; k++){
+            chamberList[k] = j-1+k;
+            if (chamberList[k] < 0) chamberList[k] += fNChamber;
+            if (chamberList[k] > fNChamber-1) chamberList[k] -= fNChamber;
+          }
+          break;
+        }
+      }
+        
+      SoLIDMCGEMHit *closeHit = NULL;
+      Double_t dist = 1.e9;
+        
+      for (Int_t j=0; j<searchChamber; j++){
+          TSeqCollection* hits = fGEMChamber[chamberList[j]]->GetHits();
+          Double_t mcU, mcV;
+          if (!fGEMChamber[chamberList[j]]->CartesianToUV(mcX, mcY, mcU, mcV) ) continue;
+          
+          for (Int_t k=0; k<hits->GetLast()+1; k++){
+            SoLIDMCGEMHit *thisHit = (SoLIDMCGEMHit*)hits->At(k); 
+            
+            if ( fabs(mcU - thisHit->GetUPos()) > 3.* fGEMChamber[chamberList[j]]->GetReadOut(0)->GetPitch() || 
+                 fabs(mcV - thisHit->GetVPos()) > 3.* fGEMChamber[chamberList[j]]->GetReadOut(1)->GetPitch() )
+                 continue;
+            
+            Double_t thisDist = sqrt( pow(mcX - thisHit->GetX(), 2) 
+                                   +  pow(mcY - thisHit->GetY(), 2) );
+            if (!fDoCombineHits && thisDist < dist){
+                dist = thisDist;
+                closeHit = thisHit;
+            }
+            else if (fDoCombineHits){
+                new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*thisHit);
+            }
+          }
+      }
+      
+      if (!fDoCombineHits && closeHit != NULL){
+        new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*closeHit);
+      }
+        
+    }
+  }
+  if (!fDoCombineHits) assert(nHit <= countMC); //for each MC hit, there is at most one cloest hit
+#endif
+  
   return 1;
 }
 //_________________________________________________________________________________________
@@ -135,9 +219,12 @@ Int_t SoLIDGEMTracker::ReadDatabase( const TDatime& date )
   fDoCombineHits = -1;
   cout<<"Initializing GEM tracker "<<fTrackerID<<endl;
   const DBRequest request[] = {
-        { "nchamber",       &fNChamber,        kInt,     0, 1 },
-        { "tracker_z",      &fTrackerZ,        kDouble,  0, 1 },
-        { "combine_hits",   &fDoCombineHits,   kInt,     0, 1 },
+        { "nchamber",          &fNChamber,        kInt,     0, 0 },
+        { "tracker_z",         &fTrackerZ,        kDouble,  0, 0 },
+        { "combine_hits",      &fDoCombineHits,   kInt,     0, 0 },
+        { "kill_cross_talk",   &fKillCrossTalk,   kInt,     0, 0 },
+        { "cross_talk_thres",  &fCrossTalkThres,  kDouble,  0, 0 },
+        { "cross_strip_apart", &fCrossStripApart, kInt,     0, 0 },
         { 0 }
       };
   Int_t status = LoadDB( file, date, request, fPrefix );
@@ -213,7 +300,7 @@ Int_t SoLIDGEMTracker::CombineChamberHits()
 #endif
     }
     
-  } 
+  }
   return nTotalHits;
 }
 //_____________________________________________________________________________________________

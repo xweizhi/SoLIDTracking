@@ -398,7 +398,6 @@ void SoLKalFieldStepper::Transport(const SoLKalTrackState  &sv_from, // site fro
    
    F = DF * F; // final propagator matrix
    sv = sv_to;
-   
 }
 //___________________________________________________________________________________________________
 Double_t SoLKalFieldStepper::RKPropagation(SoLKalMatrix &stateVec, SoLKalMatrix &fPropStep, Double_t stepSize, 
