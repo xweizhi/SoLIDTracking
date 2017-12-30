@@ -12,7 +12,7 @@ class SoLIDTrack : public TObject
   SoLIDTrack():fCoarseChi2(kINFINITY), fFineChi2(kINFINITY), fIsCoarseFitted(kFALSE), 
   fIsFineFitted(kFALSE), fStatus(1), fCharge(-1.), fMass(0.51e-3), 
   fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.), fPhi(0.), fNDF(1) {}
-  ~SoLIDTrack(){}
+  ~SoLIDTrack(){fHits.clear();}
   
   virtual Int_t Compare( const TObject* obj ) const;
   virtual Bool_t IsSortable () const { return kTRUE; }

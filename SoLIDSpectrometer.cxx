@@ -202,7 +202,7 @@ Int_t SoLIDSpectrometer::ReadRunDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-Int_t SoLIDSpectrometer::FindVertices( TClonesArray& tracks )
+Int_t SoLIDSpectrometer::FindVertices( TClonesArray& /*tracks*/ )
 {
 
   return 0;

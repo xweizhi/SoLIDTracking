@@ -969,26 +969,31 @@ StripData_t SoLIDGEMReadOut::ChargeDep( const vector<Float_t>& amp )
   adc    = (sig[0]+sig[1]+sig[2]);
 
   //adc = amp[2];
+  Float_t max = amp[2];
+  if (amp[0] > amp[2] && amp[0] > amp[1]) max = amp[0];
+  if (amp[1] > amp[0] && amp[1] > amp[2]) max = amp[1];
 
   Float_t time   = 0;     // TODO
 
   Bool_t pass;
   // Calculate ratios for 3 samples and check for bad signals
-
+#ifdef PVDIS
   if( amp[2] > 0 ) {
     Double_t r1 = amp[0] < fADCSigma ? 0 : amp[0]/(amp[2]);
     Double_t r2 = amp[1] < fADCSigma ? 0 : amp[1]/(amp[2]);
     pass = (r1 < 1.1 and r2 < 1.3 and (r1) < r2);
     } else
      pass = false;
-  
+#endif
+
+#ifdef SIDIS //actually for JPsi
+  adc = max;
   pass = true;
   if (amp[0] > amp[1] && amp[0] > amp[2] && amp[1] > amp[2]) pass = false;
-
-  //max = sig[1]+sig[2] > sig[0]+sig[1] ? sig[1]+sig[2] : sig[0]+sig[1];
+#endif
   //pass = true;
   //if (amp[0] > amp[1] && amp[1] > amp[2]) pass = false;
-  return StripData_t(amp[2], adc, time, pass);
+  return StripData_t(max, adc, time, pass);
 }
 //_____________________________________________________________________________________
 StripData_t SoLIDGEMReadOut::ChipChargeDep( const vector<Float_t>& amp )
@@ -1004,7 +1009,7 @@ StripData_t SoLIDGEMReadOut::ChipChargeDep( const vector<Float_t>& amp )
     else s.push_back(amp[i]);
   }
 
-  Float_t adcraw = s[3];
+  //Float_t adcraw = s[3];
 
   Float_t x = delta_t/Tp;
 

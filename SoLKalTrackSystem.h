@@ -1,5 +1,22 @@
 #ifndef ROOT_SOL_KAL_TRACK_SYSTEM
 #define ROOT_SOL_KAL_TRACK_SYSTEM
+//*************************************************************************
+//* ===================
+//*  TVKalSystem Class
+//* ===================
+//*
+//* (Description)
+//*   Base class for Kalman filtering class
+//* (Requires)
+//* 	TObjArray
+//* (Provides)
+//* 	class TVKalSystem
+//* (Update Recored)
+//*   2003/09/30  K.Fujii	Original version.
+//*   2005/08/25  A.Yamaguchi	Added fgCurInstancePtr and its getter & setter.
+//*   2009/06/18  K.Fujii       Implement inverse Kalman filter
+//*   2016/07/20  W.Xiong   modified for SoLID
+//*************************************************************************
 //ROOT
 #include "TObjArray.h"
 #include "TMath.h"
@@ -61,6 +78,7 @@ class SoLKalTrackSystem : public TObjArray {
   void             CheckTrackStatus();
   inline const Int_t & GetNMissingHits() const { return fNMissingHits; }
   inline void      AddMissingHits() { fNMissingHits++; }
+  inline void      SetMissingHits(Int_t a) {fNMissingHits = a;}
   Int_t  GetNHits() const { return fNHits; }
   
   virtual Int_t Compare( const TObject* obj ) const;

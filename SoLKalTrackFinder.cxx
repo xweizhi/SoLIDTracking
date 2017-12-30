@@ -7,7 +7,7 @@
 #define MAXNTRACKS 1000
 ClassImp(SoLKalTrackFinder)
 SoLKalTrackFinder::SoLKalTrackFinder()
-: fGEMTracker(nullptr), fECal(nullptr), fNTrackers(0),fNSeeds(0), fEventNum(0),
+: fGEMTracker(0), fECal(0), fNTrackers(0),fNSeeds(0), fEventNum(0),
   fBPMX(0), fBPMY(0), fChi2PerNDFCut(30.)
 {
   fFieldStepper = SoLKalFieldStepper::GetInstance();

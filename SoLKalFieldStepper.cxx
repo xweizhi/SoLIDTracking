@@ -221,6 +221,7 @@ void SoLKalFieldStepper::Transport(const SoLKalTrackState  &sv_from, // site fro
                                    SoLKalMatrix       &Q)   // process noise matrix
 {
   trackPosAtZ    = sv_from.GetZ0();
+  
   trackLength    = 0.;
   stepLength     = 0.;
   jstep          = 0;
@@ -280,7 +281,6 @@ void SoLKalFieldStepper::Transport(const SoLKalTrackState  &sv_from, // site fro
 	   
 	   
 	   stepFac = RKPropagation(sv_to, DF, stepz, bCalcJac, fIsBackward); // do one step
-	   
 	   
 	   posAt.SetXYZ(sv_to(kIdxX0, 0), sv_to(kIdxY0, 0), trackPosAtZ);//update position vector after RK propagation
        
@@ -398,6 +398,7 @@ void SoLKalFieldStepper::Transport(const SoLKalTrackState  &sv_from, // site fro
    
    F = DF * F; // final propagator matrix
    sv = sv_to;
+   
 }
 //___________________________________________________________________________________________________
 Double_t SoLKalFieldStepper::RKPropagation(SoLKalMatrix &stateVec, SoLKalMatrix &fPropStep, Double_t stepSize, 

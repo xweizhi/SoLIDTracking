@@ -87,7 +87,7 @@ Int_t SoLIDGEMChamber::Decode( const THaEvData& evdata)
   TSeqCollection* uhits = fGEMReadOut[0]->GetHits();
   TSeqCollection* vhits = fGEMReadOut[1]->GetHits();
   assert(uhits && vhits);
-  Int_t nHit = ProcessRawHits(uhits, vhits);
+  /*Int_t nHit = */ProcessRawHits(uhits, vhits);
 
   fUOccupancy = fGEMReadOut[0]->GetOccupancy();
   fVOccupancy = fGEMReadOut[1]->GetOccupancy();
@@ -124,7 +124,7 @@ THaAnalysisObject::EStatus SoLIDGEMChamber::Init( const TDatime& date )
   return fStatus = kOK;
 }
 //_________________________________________________________________________________________
-void SoLIDGEMChamber::Print( Option_t* opt ) const
+void SoLIDGEMChamber::Print( Option_t* /*opt*/ ) const
 {
 
 }
@@ -394,6 +394,9 @@ Int_t SoLIDGEMChamber::ProcessRawHits(TSeqCollection* uhits, TSeqCollection* vhi
     }
   }
   //sort the hit array now from small radius to large radius
+  delete uit;
+  delete vit;
+
   fHits->Sort();
   return nHit;
 }

@@ -502,14 +502,6 @@ void PVDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
     
     if (!thisSystem->GetTrackStatus()) continue;
 
-    /*if (!do3Hit && thisSystem->GetNHits() == 3){
-
-        if (fNGoodTrack == 0) {
-            do3Hit = true;
-        }else{
-            break;
-        }
-    }*/
     
     Int_t flag = 0;
     //start from 1 because the 0th is the dummy site that we used to initialize Kalman Filter
@@ -539,6 +531,9 @@ void PVDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
       else{
         newtrack = new ((*theTracks)[fNGoodTrack++]) SoLIDTrack();
       }
+      
+      
+      
     CopyTrack(newtrack, thisSystem);
     }
 
