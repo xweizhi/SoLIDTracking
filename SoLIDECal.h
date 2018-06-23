@@ -8,6 +8,7 @@
 #include <vector>
 //ROOT
 #include "TRandom.h"
+#include "TClonesArray.h"
 //Hall A Analyzer
 #include "THaDetMap.h"
 #include "THaSubDetector.h"
@@ -21,10 +22,10 @@ enum ECalMapKey { kECalXPos = 0, kECalYPos, kECalEdp };
 class SoLIDECal : public THaSubDetector
 {
   public:
-  SoLIDECal();
   SoLIDECal( const char* name, const char* description = "",
            THaDetectorBase* parent = 0 );
-  ~SoLIDECal();
+  SoLIDECal():fCaloHits(0) {}
+  virtual ~SoLIDECal();
   
   virtual void      Clear( Option_t* opt="" );
   virtual Int_t     Decode( const THaEvData& );
@@ -38,7 +39,7 @@ class SoLIDECal : public THaSubDetector
   Bool_t  IsLAECTriggered() const { return fIsLAECTriggered; }
   UInt_t  GetNLAECHits()    const { return fNLAECHits; }
   UInt_t  GetNFAECHits()    const { return fNFAECHits; }
-  vector<SoLIDCaloHit> * GetCaloHits()  { return &fCaloHits; }                
+  TClonesArray * GetCaloHits()  { return fCaloHits; }                
 
   const Double_t & GetECZ(ECType type) const { if (type == kFAEC) return fFAECZ;
                                               else return fLAECZ; }
@@ -49,6 +50,7 @@ class SoLIDECal : public THaSubDetector
   void    SmearEnergy(Float_t *energy);
   protected:
   virtual Int_t     ReadDatabase( const TDatime& date );
+  
   virtual Int_t     DefineVariables( EMode mode = kDefine );
   
   Bool_t                          fIsLAECTriggered;
@@ -68,7 +70,7 @@ class SoLIDECal : public THaSubDetector
   Double_t                        fMRPCPhiReso;
   Double_t                        fMRPCRmin;
 #endif
-  vector<SoLIDCaloHit>            fCaloHits;
+  TClonesArray*                   fCaloHits;
   
   ClassDef(SoLIDECal,0)
 };

@@ -35,6 +35,8 @@ SoLIDGEMChamber::SoLIDGEMChamber(Int_t ichamber, const char* name, const char* d
     MakeZombie();
     return;
   }
+  
+
 
 }
 //_________________________________________________________________________________________
@@ -99,6 +101,7 @@ Int_t SoLIDGEMChamber::Decode( const THaEvData& evdata)
 //_________________________________________________________________________________________
 THaAnalysisObject::EStatus SoLIDGEMChamber::Init( const TDatime& date )
 {
+
   EStatus status = THaAnalysisObject::Init(date);
   if (status == kOK){
     //fGEMReadOut = new SoLIDGEMReadOut *[fNReadOut];
@@ -325,7 +328,6 @@ Int_t SoLIDGEMChamber::DefineVariables(EMode mode)
   // initialize global variables
   if( mode == kDefine && fIsSetup ) return kOK;
   fIsSetup = ( mode == kDefine );
-
   // Register variables in global list
   Int_t ret;
 #ifdef MCDATA

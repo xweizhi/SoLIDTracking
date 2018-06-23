@@ -11,7 +11,7 @@ class SoLIDTrack : public TObject
   public:
   SoLIDTrack():fCoarseChi2(kINFINITY), fFineChi2(kINFINITY), fIsCoarseFitted(kFALSE), 
   fIsFineFitted(kFALSE), fStatus(1), fCharge(-1.), fMass(0.51e-3), 
-  fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.), fPhi(0.), fNDF(1) {}
+  fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.), fPhi(0.), fNDF(1), fSelectFlag(0) {}
   ~SoLIDTrack(){fHits.clear();}
   
   virtual Int_t Compare( const TObject* obj ) const;
@@ -26,15 +26,17 @@ class SoLIDTrack : public TObject
   void         SetMass(Double_t mass)        { fMass = mass; }
   void         SetPID(Int_t pid)             { fPID = pid; }
   void         SetAngleFlag(Int_t angleflag) { fAngleFlag = angleflag; }
-  void         SetMomMax(Double_t mommax)    { fMomMax = mommax; }
-  void         SetMomMin(Double_t mommin)    { fMomMin = mommin; }
-  void         SetThetaMax(Double_t thetamax){ fThetaMax = thetamax; }
-  void         SetThetaMin(Double_t thetamin){ fThetaMin = thetamin; }
+  void         SetECX(Double_t ecx)          { fECX = ecx; }
+  void         SetECY(Double_t ecy)          { fECY = ecy; }
+  void         SetECE(Double_t ece)          { fECE = ece; }
+  void         SetECEx(Double_t ecex)        { fECEx = ecex; }
+  void         SetECEy(Double_t ecey)        { fECEy = ecey; }
   void         SetMomentum(Double_t momentum){ fMomentum = momentum; }
   void         SetVertexZ(Double_t vertexz)  { fVertexZ = vertexz; }
   void         SetTheta(Double_t theta)      { fTheta = theta; }
   void         SetPhi(Double_t phi)          { fPhi = phi; } 
   void         SetNDF(Int_t ndf)             { fNDF = ndf; }
+  void         SetSelectFlag(Int_t f)        { fSelectFlag = f; }
   
   void         SetBackTheta(Double_t theta)  { fBackTheta = theta; }
   void         SetBackPhi(Double_t phi)      { fBackPhi = phi; }
@@ -54,10 +56,11 @@ class SoLIDTrack : public TObject
   Double_t     GetMass()               const { return fMass; }
   Double_t     GetPID()                const { return fPID; }
   Int_t        GetAngleFlag()          const { return fAngleFlag; }
-  Double_t     GetMomMax()             const { return fMomMax; }
-  Double_t     GetMomMin()             const { return fMomMin; }
-  Double_t     GetThetaMax()           const { return fThetaMax; }
-  Double_t     GetThetaMin()           const { return fThetaMin; }
+  Double_t     GetECX()                const { return fECX; }
+  Double_t     GetECY()                const { return fECY; }
+  Double_t     GetECE()                const { return fECE; }
+  Double_t     GetECEx()               const { return fECEx; }
+  Double_t     GetECEy()               const { return fECEy; }
   Double_t     GetMomentum()           const { return fMomentum; }
   Double_t     GetVertexZ()            const { return fVertexZ; }
   Double_t     GetTheta()              const { return fTheta; }
@@ -65,6 +68,7 @@ class SoLIDTrack : public TObject
   Int_t        GetNDF()                const { return fNDF; }
   Double_t     GetChi2perNDF()         const { return fIsFineFitted ? 
                fFineChi2/(Double_t)fNDF : fCoarseChi2/(Double_t)fNDF; }
+  Int_t        GetSelectFlag()         const { return fSelectFlag; }
   
   void         AddHit(SoLIDGEMHit* theHit) { fHits.push_back(theHit); }
   
@@ -147,6 +151,20 @@ class SoLIDTrack : public TObject
   Double_t     GetHit4Chi2()             const { return GetHitInfo(4, 14); }
   Double_t     GetHit5Chi2()             const { return GetHitInfo(5, 14); }
 
+  Double_t     GetHit0QU()               const { return GetHitInfo(0, 15); }
+  Double_t     GetHit1QU()               const { return GetHitInfo(1, 15); }
+  Double_t     GetHit2QU()               const { return GetHitInfo(2, 15); }
+  Double_t     GetHit3QU()               const { return GetHitInfo(3, 15); }
+  Double_t     GetHit4QU()               const { return GetHitInfo(4, 15); }
+  Double_t     GetHit5QU()               const { return GetHitInfo(5, 15); }
+
+  Double_t     GetHit0QV()               const { return GetHitInfo(0, 16); }
+  Double_t     GetHit1QV()               const { return GetHitInfo(1, 16); }
+  Double_t     GetHit2QV()               const { return GetHitInfo(2, 16); }
+  Double_t     GetHit3QV()               const { return GetHitInfo(3, 16); }
+  Double_t     GetHit4QV()               const { return GetHitInfo(4, 16); }
+  Double_t     GetHit5QV()               const { return GetHitInfo(5, 16); }
+
   Double_t     GetBackTheta()           const { return fBackTheta; }
   Double_t     GetBackPhi()             const { return fBackPhi; }
   Double_t     GetBackX()               const { return fBackX; }
@@ -166,15 +184,18 @@ class SoLIDTrack : public TObject
   Double_t fMass;
   Int_t    fPID;
   Int_t    fAngleFlag;               //0 for SIDIS large angle, 1 for SIDIS forwardangle, 0 for PVDIS
-  Double_t fMomMax;
-  Double_t fMomMin;
-  Double_t fThetaMax;
-  Double_t fThetaMin;
+  Double_t fECX;
+  Double_t fECY;
+  Double_t fECE;
+  Double_t fECEx;
+  Double_t fECEy;
   Double_t fMomentum;
   Double_t fVertexZ;
   Double_t fTheta;
   Double_t fPhi;
   Int_t fNDF;
+  Int_t fSelectFlag;                  //whether the track is the best within tracks that share
+                                      // common hits
   
   //back track info
   Double_t fBackTheta;

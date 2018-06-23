@@ -110,15 +110,20 @@ inline Int_t NumberOfSetBits( UInt_t v )
 }
 
 //_____________________________________________________________________________
-struct SoLIDCaloHit{
+class SoLIDCaloHit : public TObject{
+  public:
+  SoLIDCaloHit() {}
+  SoLIDCaloHit(Double_t xpos, Double_t ypos, Int_t plane, Double_t edp) :
+  fXPos(xpos), fYPos(ypos), fECID(plane), fEdp(edp) {}
+  ~SoLIDCaloHit() {}
   Double_t fXPos;
   Double_t fYPos;
   Int_t    fECID;
   Double_t fEdp;
-  SoLIDCaloHit() {}
-  SoLIDCaloHit(Double_t xpos, Double_t ypos, Int_t plane, Double_t edp) :
-  fXPos(xpos), fYPos(ypos), fECID(plane), fEdp(edp) {}
+  
+  ClassDef(SoLIDCaloHit, 1)
 };
+ClassImp(SoLIDCaloHit)
 #endif
 
 

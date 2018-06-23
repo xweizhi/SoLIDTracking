@@ -65,7 +65,7 @@ protected:
   SoLIDGEMHit* FindCloestHitInWindow(double &x, double &y);
   Bool_t     CheckChargeAsy(SoLKalTrackSystem* theSystem);
   Double_t   FindVertexZ(SoLKalTrackState* thisState);
-  void       CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSystem* kaltrack);
+  void       CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSystem* kaltrack, int flag = 0);
   Double_t   GetPhiCorrection(SeedType& type, Double_t& theta);  
   
   
@@ -84,6 +84,7 @@ protected:
   Double_t fMomMinCut;
   Double_t fMomMaxCut;
   Double_t fCellEdgeCut;
+  Int_t    fOutputAllTracks;
   
   ClassDef(PVDISKalTrackFinder,0)
 };

@@ -19,6 +19,7 @@ PVDISKalTrackFinder::PVDISKalTrackFinder(bool isMC, const char* name)
   fWindowHits.reserve(MAXWINDOWHIT);
   planeChi2[0] = 50; planeChi2[1] = 50; planeChi2[2] = 50;
   planeChi2[3] = 50; planeChi2[4] = 50;
+
 }
 //_____________________________________________________________________________
 PVDISKalTrackFinder::~PVDISKalTrackFinder()
@@ -76,6 +77,7 @@ Int_t PVDISKalTrackFinder::ReadDatabase (const TDatime& date)
           { "momentum_min",                &fMomMinCut,                      kDouble, 0, 0},
           { "momentum_max",                &fMomMaxCut,                      kDouble, 0, 0},
           { "cell_edge_cut",               &fCellEdgeCut,                    kDouble, 0, 0},
+          { "output_all_recon_tracks",     &fOutputAllTracks,                kInt   , 0, 0},
           { 0 }
         };
         Int_t err = LoadDB (file, date, request, fPrefix);
@@ -86,6 +88,8 @@ Int_t PVDISKalTrackFinder::ReadDatabase (const TDatime& date)
         fclose(file);
         throw;
     }
+    
+
     return kOK;
 }
 //____________________________________________________________________________
@@ -176,10 +180,10 @@ void PVDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek)
           Double_t xj  = hitj->GetX();
           Double_t yj  = hitj->GetY();
           Double_t zj  = hitj->GetZ();
-          Double_t xec = fCaloHits->at(ECIndexk).fXPos;
-          Double_t yec = fCaloHits->at(ECIndexk).fYPos;
+          Double_t xec = ((SoLIDCaloHit*)fCaloHits->At(ECIndexk))->fXPos;
+          Double_t yec = ((SoLIDCaloHit*)fCaloHits->At(ECIndexk))->fYPos;
 
-          Double_t initMom = fCaloHits->at(ECIndexk).fEdp;
+          Double_t initMom = ((SoLIDCaloHit*)fCaloHits->At(ECIndexk))->fEdp;
           Double_t initTheta = acos( (zk-zj)/( sqrt(pow(xk-xj, 2) + pow(yk-yj, 2) + pow(zk-zj,2))) );
           Double_t initPhi = atan2(yk - yj, xk - xj) + GetPhiCorrection(seedType, initTheta);
           Double_t charge = -1.;
@@ -354,7 +358,7 @@ void PVDISKalTrackFinder::TrackFollow()
       if (size <= 0){
 
         thisSystem->AddMissingHits();
-
+        //delete predictState;
       }
       else if (size == 1){
         SoLKalTrackSite &newSite = *new SoLKalTrackSite(fWindowHits.at(0), kMdim, kSdim, planeChi2[currentTracker]);
@@ -520,8 +524,8 @@ void PVDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
       }
 
     }
-    
-    if (flag == 0){
+
+    if (flag == 0 && !fOutputAllTracks){
       SoLIDTrack* newtrack = 0;
       if (fIsMC){
 #ifdef MCDATA
@@ -531,10 +535,19 @@ void PVDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
       else{
         newtrack = new ((*theTracks)[fNGoodTrack++]) SoLIDTrack();
       }
-      
-      
-      
-    CopyTrack(newtrack, thisSystem);
+    CopyTrack(newtrack, thisSystem, flag);
+    }
+    else if (fOutputAllTracks){
+      SoLIDTrack* newtrack = 0;
+      if (fIsMC){
+#ifdef MCDATA
+        newtrack = new ((*theTracks)[fNGoodTrack++]) SoLIDMCTrack();
+#endif
+      }
+      else{
+        newtrack = new ((*theTracks)[fNGoodTrack++]) SoLIDTrack();
+      }
+      CopyTrack(newtrack, thisSystem, flag);
     }
 
   }
@@ -562,26 +575,29 @@ void PVDISKalTrackFinder::ECalFinalMatch()
     SoLKalTrackState *predictState = currentState.PredictSVatNextZ(ecalZ);
     
     thisSystem->SetTrackStatus(kFALSE);
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	    if (fCaloHits->at(ec_count).fECID != thisSystem->GetAngleFlag()) continue;
-	    Double_t posCut = thisSystem->GetNHits() == 3 ? 3.*0.01 : 5.*0.01;
-	    Double_t ECalReso = fECal->GetEReso()/sqrt(fCaloHits->at(ec_count).fEdp);
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+        SoLIDCaloHit* thisHit = (SoLIDCaloHit*)fCaloHits->At(ec_count);
+	    if (thisHit->fECID != thisSystem->GetAngleFlag()) continue;
+	    Double_t posCut = 5.*0.01;
+	    Double_t ECalReso = fECal->GetEReso()/sqrt(thisHit->fEdp);
 	    //final position cut and energy on the calorimeter, for energy cut, require that
 	    //the measurement energy on EC cannot be much larger than the reconstructed energy
 	    //at the vertex, due to radiative energy loss
 	    
-	    Double_t deltax = fabs(fCaloHits->at(ec_count).fXPos - (*predictState)(kIdxX0, 0));
-	    Double_t deltay = fabs(fCaloHits->at(ec_count).fYPos - (*predictState)(kIdxY0, 0));
-	    Double_t deltae = (fCaloHits->at(ec_count).fEdp - thisSystem->GetMomentum())/fCaloHits->at(ec_count).fEdp;
+	    Double_t deltax = fabs(thisHit->fXPos - (*predictState)(kIdxX0, 0));
+	    Double_t deltay = fabs(thisHit->fYPos - (*predictState)(kIdxY0, 0));
+	    Double_t deltae = (thisHit->fEdp - thisSystem->GetMomentum())/thisHit->fEdp;
 	    
 	    if ( deltax <posCut && deltay <posCut && deltae < 3.*ECalReso){
 	     
 	      Double_t momentum = thisSystem->GetCharge() / (*predictState)(kIdxQP, 0);
 	      
 	      thisSystem->SetTrackStatus(kTRUE);
-	      thisSystem->fDeltaECX = fCaloHits->at(ec_count).fXPos - (*predictState)(kIdxX0, 0);
-	      thisSystem->fDeltaECY = fCaloHits->at(ec_count).fYPos - (*predictState)(kIdxY0, 0);
-	      thisSystem->fDeltaECE = (fCaloHits->at(ec_count).fEdp - momentum)/fCaloHits->at(ec_count).fEdp;
+	      thisSystem->fDeltaECX = /*thisHit->fXPos;*/ (*predictState)(kIdxX0, 0);
+	      thisSystem->fDeltaECY = /*thisHit->fYPos;*/ (*predictState)(kIdxY0, 0);
+	      thisSystem->fDeltaECE = momentum;
+	      thisSystem->fDeltaECEx = sqrt((predictState->GetCovMat())(kIdxX0, kIdxX0));
+	      thisSystem->fDeltaECEy = sqrt((predictState->GetCovMat())(kIdxY0, kIdxY0));
 	      //thisSystem->IncreaseChi2(pow(deltax/0.01, 2) + pow(deltay/0.01, 2)); 
 	      //thisSystem->IncreaseChi2(pow(deltae/ECalReso, 2));    
 	    }
@@ -593,11 +609,12 @@ void PVDISKalTrackFinder::ECalFinalMatch()
 //______________________________________________________________________________
 inline Bool_t PVDISKalTrackFinder::ECCoarseCheck(SoLIDGEMHit *theHit, Int_t& index)
 {
-  for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	  assert(fCaloHits->at(ec_count).fECID != kLAEC); //should never happen for PVDIS
-	  Double_t ecHitPhi = TMath::ATan2(fCaloHits->at(ec_count).fYPos, fCaloHits->at(ec_count).fXPos);
-	  Double_t ecHitR = TMath::Sqrt( TMath::Power(fCaloHits->at(ec_count).fXPos, 2) +
-	    			  	TMath::Power(fCaloHits->at(ec_count).fYPos, 2) );
+  for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+      SoLIDCaloHit* thisHit = (SoLIDCaloHit*)fCaloHits->At(ec_count);
+	  assert(thisHit->fECID != kLAEC); //should never happen for PVDIS
+	  Double_t ecHitPhi = TMath::ATan2(thisHit->fYPos, thisHit->fXPos);
+	  Double_t ecHitR = TMath::Sqrt( TMath::Power(thisHit->fXPos, 2) +
+	    			  	TMath::Power(thisHit->fYPos, 2) );
 	  Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	  Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
 	  if (theHit->GetTrackerID()==3 && (tmpDeltaPhi < 0.035 && tmpDeltaPhi > -0.025) && (tmpDeltaR < 0.18 && tmpDeltaR > 0.02)){
@@ -760,7 +777,7 @@ inline Double_t PVDISKalTrackFinder::GetPhiCorrection(SeedType& type, Double_t& 
     else return 0.0504595 + -0.163796*theta + 0.115481*theta*theta;
 }
 //_______________________________________________________________________________________
-inline void PVDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSystem* kaltrack)
+inline void PVDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSystem* kaltrack, int flag)
 {
     soltrack->SetStatus(kaltrack->GetTrackStatus());
     soltrack->SetCoarseFitStatus(kTRUE);
@@ -772,31 +789,36 @@ inline void PVDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSyst
     soltrack->SetVertexZ(kaltrack->GetVertexZ());
     soltrack->SetPhi(kaltrack->GetPhi());
     soltrack->SetTheta(kaltrack->GetTheta());
-    soltrack->SetMomMax(kaltrack->fDeltaECX);
-    soltrack->SetMomMin(kaltrack->fDeltaECY);
-    soltrack->SetThetaMin(kaltrack->fDeltaECE);
+    soltrack->SetECX(kaltrack->fDeltaECX);
+    soltrack->SetECY(kaltrack->fDeltaECY);
+    soltrack->SetECE(kaltrack->fDeltaECE);
+    soltrack->SetECEx(kaltrack->fDeltaECEx);
+    soltrack->SetECEy(kaltrack->fDeltaECEy);
+    
+    soltrack->SetSelectFlag(1-flag);
 
     //start from 1 because the 0th is the dummy site that we used to initialize Kalman Filter
 
     for (Int_t j=1; j!=kaltrack->GetLast()+1;j++){
         SoLIDGEMHit* thishit = 0;
-        Int_t layer = 0;
 
         thishit = (SoLIDGEMHit*)(static_cast<SoLKalTrackSite*>(kaltrack->At(j))->GetPredInfoHit());
         //thishit->SetUsed();
-        layer = thishit->GetTrackerID();
+        if (flag == 0){
+            Int_t layer = 0;
+            layer = thishit->GetTrackerID();
 
-        map< Int_t, vector<SoLIDGEMHit*> >::iterator it = fGoodHits.find(layer);
+            map< Int_t, vector<SoLIDGEMHit*> >::iterator it = fGoodHits.find(layer);
 
-        if (it != fGoodHits.end()){
-            (it->second).push_back(thishit);
+            if (it != fGoodHits.end()){
+                (it->second).push_back(thishit);
+            }
+            else{
+                vector<SoLIDGEMHit*> thisVector;
+                thisVector.push_back(thishit);
+                fGoodHits.insert(std::pair<Int_t, vector<SoLIDGEMHit*> >(layer, thisVector));
+            }
         }
-        else{
-            vector<SoLIDGEMHit*> thisVector;
-            thisVector.push_back(thishit);
-            fGoodHits.insert(std::pair<Int_t, vector<SoLIDGEMHit*> >(layer, thisVector));
-        }
-
         assert(thishit != 0);
         soltrack->AddHit(thishit);
     }

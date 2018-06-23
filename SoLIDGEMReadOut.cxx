@@ -186,7 +186,7 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
       assert( nsamp > 0 );
       ++fNRawStrips;
       nsamp = TMath::Min( nsamp, static_cast<Int_t>(fMaxTimeSample) );
-      if (fDeconMode) nsamp = 5;
+      if (fDeconMode == 1) nsamp = 5;
       // Integrate the signal over time and analyze pulse shape
       StripData_t stripdata;
       if( nsamp > 1 ) {
@@ -197,17 +197,19 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
 	  samples.push_back( fsamp );
 	}
 	// Analyze the pulse shape
-	if (fDeconMode){
-          stripdata = ChipChargeDep(samples);
+	if (fDeconMode == 1){
+            stripdata = ChipChargeDep(samples);
+        }else if (fDeconMode == 2){
+            stripdata = SAMPAChargeDep(samples);
         }else{
-	  stripdata = ChargeDep(samples);
+	        stripdata = ChargeDep(samples);
         }
       }
       else {
-	stripdata.adcraw = stripdata.adc =
-	  static_cast<Float_t>( evdata.GetData(d->crate, d->slot, chan, 2) );
-	stripdata.time = 0;
-	stripdata.pass = true;
+        stripdata.adcraw = stripdata.adc =
+          static_cast<Float_t>( evdata.GetData(d->crate, d->slot, chan, 2) );
+        stripdata.time = 0;
+        stripdata.pass = true;
       }
       // Skip null data
       if( stripdata.adcraw == 0 )
@@ -1031,6 +1033,28 @@ StripData_t SoLIDGEMReadOut::ChipChargeDep( const vector<Float_t>& amp )
   Bool_t pass = true;
 
   return StripData_t( adc, adc,time,pass );
+}
+//______________________________________________________________________________________
+StripData_t SoLIDGEMReadOut::SAMPAChargeDep( const vector<Float_t>& amp )
+{
+    assert( amp.size() >= 5 );
+    
+    Float_t adc = 0.;
+    for (unsigned int i=1; i<7; i++) adc += amp[i];
+    adc /= 6.;
+    
+    Bool_t pass = false;
+    
+     if (  ((amp[3] > amp[2] && amp[3] > amp[4]) || 
+            (amp[4] > amp[3] && amp[4] > amp[5]) || 
+            (amp[5] > amp[4] && amp[5] > amp[6]) ||
+            (amp[3] > 950 && amp[4] > 950 && amp[5] > 950) ) ) pass = true;
+            
+     if (! (amp[3] > amp[1] || amp[4] > amp[1] || amp[5] > amp[1])) pass = false;
+    
+    Float_t time = 0.;
+    
+    return StripData_t(adc, adc, time, pass);
 }
 //______________________________________________________________________________________
 Int_t SoLIDGEMReadOut::MapChannel( Int_t idx ) const

@@ -72,6 +72,7 @@ class SoLIDGEMReadOut : public THaSubDetector{
   virtual Int_t     DefineVariables( EMode mode = kDefine );
   StripData_t       ChargeDep( const vector<Float_t>& amp );
   StripData_t       ChipChargeDep( const vector<Float_t>& amp);
+  StripData_t       SAMPAChargeDep( const vector<Float_t>& amp);
   Int_t             MapChannel( Int_t idx ) const;
   void              AddStrip( Int_t istrip );
   void              UpdateOffset();

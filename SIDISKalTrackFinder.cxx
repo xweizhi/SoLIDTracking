@@ -291,19 +291,19 @@ void SIDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType typ
         
             fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
                                                charge, stepSize, finalMomentum, finalPosition);
-            for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	            if (fCaloHits->at(ec_count).fECID != kFAEC) continue; //not FAEC hit
-	            if (sqrt( pow(finalPosition.X() - fCaloHits->at(ec_count).fXPos, 2) +  
-	                  pow(finalPosition.Y() - fCaloHits->at(ec_count).fYPos, 2) ) < fCoarseECPosCut[type] ) isSeed = true;
+            for (UInt_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+	            if ( ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fECID != kFAEC) continue; //not FAEC hit
+	            if (sqrt( pow(finalPosition.X() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos, 2) +  
+	                  pow(finalPosition.Y() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fYPos, 2) ) < fCoarseECPosCut[type] ) isSeed = true;
 	          } 
 		      }
 		      else if (type == kLAEC){
             fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
                                                charge, stepSize, finalMomentum, finalPosition);
-            for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	            if (fCaloHits->at(ec_count).fECID != kLAEC) continue; //not FAEC hit
-	            if (sqrt( pow(finalPosition.X() - fCaloHits->at(ec_count).fXPos, 2) +  
-	                  pow(finalPosition.Y() - fCaloHits->at(ec_count).fYPos, 2) ) < fCoarseECPosCut[type] ) isSeed = true;
+            for (UInt_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+	            if ( ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fECID != kLAEC) continue; //not FAEC hit
+	            if (sqrt( pow(finalPosition.X() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos, 2) +  
+	                  pow(finalPosition.Y() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fYPos, 2) ) < fCoarseECPosCut[type] ) isSeed = true;
 	          } 
 		      }
 		      if (!isSeed) continue;
@@ -686,10 +686,12 @@ void SIDISKalTrackFinder::ECalFinalMatch()
     SoLKalTrackState *predictState = currentState.PredictSVatNextZ(ecalZ);
     
     thisSystem->SetTrackStatus(kFALSE);
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	    if (fCaloHits->at(ec_count).fECID != thisSystem->GetAngleFlag()) continue;
-	    if ( fabs(fCaloHits->at(ec_count).fXPos - (*predictState)(kIdxX0, 0)) <fECPosCut &&
-	         fabs(fCaloHits->at(ec_count).fYPos - (*predictState)(kIdxY0, 0)) <fECPosCut  ){
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+        SoLIDCaloHit* thisHit = ((SoLIDCaloHit*)fCaloHits->At(ec_count));
+    
+	    if (thisHit->fECID != thisSystem->GetAngleFlag()) continue;
+	    if ( fabs(thisHit->fXPos - (*predictState)(kIdxX0, 0)) <fECPosCut &&
+	         fabs(thisHit->fYPos - (*predictState)(kIdxY0, 0)) <fECPosCut  ){
 	      
 	      //for large angle, require also that the momentum of the track needs to match the 
 	      //cluster energy. This is difficult to do for forward angle since we detect both hadron
@@ -698,19 +700,19 @@ void SIDISKalTrackFinder::ECalFinalMatch()
 	      //and field integral to measure it
 	      Int_t type = thisSystem->GetAngleFlag();
 	      Double_t momentum = thisSystem->GetCharge() / (*predictState)(kIdxQP, 0);
-	      Double_t e_reso = fECal->GetEReso()/sqrt(fCaloHits->at(ec_count).fEdp);
+	      Double_t e_reso = fECal->GetEReso()/sqrt(thisHit->fEdp);
 	      if (fECEnergyMatch[type]){  
 	        if (type == kLAEC){
-	            if ( ((fCaloHits->at(ec_count).fEdp) - momentum)/fCaloHits->at(ec_count).fEdp > 3.*e_reso ) continue;
-	            if ( fabs( (momentum - fCaloHits->at(ec_count).fEdp) / momentum) > 0.5) continue;
+	            if ( ((thisHit->fEdp) - momentum)/thisHit->fEdp > 3.*e_reso ) continue;
+	            if ( fabs( (momentum - thisHit->fEdp) / momentum) > 0.5) continue;
 	        }else{
-	            if ( ((fCaloHits->at(ec_count).fEdp) - momentum)/fCaloHits->at(ec_count).fEdp > 3.*e_reso ) continue;
+	            if ( ((thisHit->fEdp) - momentum)/thisHit->fEdp > 3.*e_reso ) continue;
 	        }
 	      }
 	      thisSystem->SetTrackStatus(kTRUE);
-	      thisSystem->fDeltaECX = fCaloHits->at(ec_count).fXPos - (*predictState)(kIdxX0, 0);
-	      thisSystem->fDeltaECY = fCaloHits->at(ec_count).fYPos - (*predictState)(kIdxY0, 0);
-	      thisSystem->fDeltaECE = (momentum - fCaloHits->at(ec_count).fEdp)/momentum;    
+	      thisSystem->fDeltaECX = thisHit->fXPos;// - (*predictState)(kIdxX0, 0);
+	      thisSystem->fDeltaECY = thisHit->fYPos;// - (*predictState)(kIdxY0, 0);
+	      thisSystem->fDeltaECE = thisHit->fEdp;    
 	    }
 	  }
 	  
@@ -765,37 +767,40 @@ inline SoLKalTrackSite & SIDISKalTrackFinder::SiteInitWithSeed(DoubletSeed* this
 inline Double_t SIDISKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType type)
 {
   if (type == kLAEC){
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	    if (fCaloHits->at(ec_count).fECID != kLAEC) continue; //not LAEC hit
-	    Double_t ecHitPhi = TMath::ATan2(fCaloHits->at(ec_count).fYPos, fCaloHits->at(ec_count).fXPos);
-	    Double_t ecHitR = TMath::Sqrt( TMath::Power(fCaloHits->at(ec_count).fXPos, 2) + 
-	    			  	   TMath::Power(fCaloHits->at(ec_count).fYPos, 2) );
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+        SoLIDCaloHit* thisHit = (SoLIDCaloHit*)(fCaloHits->At(ec_count));
+    
+	    if (thisHit->fECID != kLAEC) continue; //not LAEC hit
+	    Double_t ecHitPhi = TMath::ATan2(thisHit->fYPos, thisHit->fXPos);
+	    Double_t ecHitR = TMath::Sqrt( TMath::Power(thisHit->fXPos, 2) + 
+	    			  	   TMath::Power(thisHit->fYPos, 2) );
 	    Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	    Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
 	    if (theHit->GetTrackerID()==2 && (tmpDeltaPhi < fDeltaPhiMax[4][type] && tmpDeltaPhi > fDeltaPhiMin[4][type]) && 
 	       (tmpDeltaR < fDeltaRMax[4][type] && tmpDeltaR > fDeltaRMin[4][type])){
-            return fCaloHits->at(ec_count).fEdp;
+            return thisHit->fEdp;
         }else if (theHit->GetTrackerID()==3 && (tmpDeltaPhi<fDeltaPhiMax[3][type] && tmpDeltaPhi> fDeltaPhiMin[3][type]) && 
                  (tmpDeltaR<fDeltaRMax[3][type] && tmpDeltaR > fDeltaRMin[3][type]) ){
-            return fCaloHits->at(ec_count).fEdp;
+            return thisHit->fEdp;
         }
 	  }
   }
   else if (type == kFAEC){
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++)
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++)
 	    {
-	      if (fCaloHits->at(ec_count).fECID != kFAEC) continue; //not FAEC hit
-	      Double_t ecHitPhi = TMath::ATan2(fCaloHits->at(ec_count).fYPos, fCaloHits->at(ec_count).fXPos);
-	      Double_t ecHitR = TMath::Sqrt( TMath::Power(fCaloHits->at(ec_count).fXPos, 2) + 
-				  	   TMath::Power(fCaloHits->at(ec_count).fYPos, 2) );
+	      SoLIDCaloHit* thisHit = (SoLIDCaloHit*)(fCaloHits->At(ec_count));
+	      if (thisHit->fECID != kFAEC) continue; //not FAEC hit
+	      Double_t ecHitPhi = TMath::ATan2(thisHit->fYPos, thisHit->fXPos);
+	      Double_t ecHitR = TMath::Sqrt( TMath::Power(thisHit->fXPos, 2) + 
+				  	   TMath::Power(thisHit->fYPos, 2) );
 	      Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	      Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
 	      if (theHit->GetTrackerID()==4 && (tmpDeltaPhi < fDeltaPhiMax[4][type] && tmpDeltaPhi > fDeltaPhiMin[4][type]) && 
 	         (tmpDeltaR < fDeltaRMax[4][type] && tmpDeltaR > fDeltaRMin[4][type])){
-	        return fCaloHits->at(ec_count).fEdp;
+	        return thisHit->fEdp;
 	      }else if (theHit->GetTrackerID()==5 && (tmpDeltaPhi<fDeltaPhiMax[3][type] && tmpDeltaPhi> fDeltaPhiMin[3][type]) && 
 	               (tmpDeltaR<fDeltaRMax[3][type] && tmpDeltaR > fDeltaRMin[3][type]) ){
-	        return fCaloHits->at(ec_count).fEdp;
+	        return thisHit->fEdp;
 	      }
 	    }
   }
@@ -871,9 +876,9 @@ inline void SIDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSyst
   soltrack->SetVertexZ(kaltrack->GetVertexZ());
   soltrack->SetPhi(kaltrack->GetPhi());
   soltrack->SetTheta(kaltrack->GetTheta());
-  soltrack->SetMomMax(kaltrack->fDeltaECX);
-  soltrack->SetMomMin(kaltrack->fDeltaECY);
-  soltrack->SetThetaMin(kaltrack->fDeltaECE);
+  soltrack->SetECX(kaltrack->fDeltaECX);
+  soltrack->SetECY(kaltrack->fDeltaECY);
+  soltrack->SetECE(kaltrack->fDeltaECE);
   
   //start from 1 because the 0th is the dummy site that we used to initialize Kalman Filter
   //TODO remember not to add the last one since later it will be the BPM, not GEM hit

@@ -90,7 +90,7 @@ protected:
   Double_t                             fTargetCenter;
   Double_t                             fTargetLength;
   Double_t                             fChi2PerNDFCut;
-  vector<SoLIDCaloHit>*                fCaloHits;
+  TClonesArray*                        fCaloHits;
   map< SeedType, vector<DoubletSeed> > fSeedPool;
   
   ClassDef(SoLKalTrackFinder,0)

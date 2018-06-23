@@ -36,8 +36,8 @@ void SoLKalTrackFinder::SetGEMDetector(vector<SoLIDGEMTracker*> thetrackers)
 //__________________________________________________________________________
 void SoLKalTrackFinder::SetBPM(Double_t x, Double_t y)
 {
-  fBPMX = x + gRandom->Gaus(0., 3e-4);
-  fBPMY = y + gRandom->Gaus(0., 3e-4);
+  fBPMX = x;
+  fBPMY = y;
 }
 //__________________________________________________________________________
 void SoLKalTrackFinder::SetTargetGeometry(Double_t& z, Double_t& center, Double_t& length)

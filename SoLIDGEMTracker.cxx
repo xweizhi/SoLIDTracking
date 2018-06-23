@@ -42,6 +42,7 @@ SoLIDGEMTracker::SoLIDGEMTracker(Int_t iGEM, const char* name, const char* descr
 //_________________________________________________________________________________________
 SoLIDGEMTracker::~SoLIDGEMTracker()
 {
+
   if( fIsSetup )
     RemoveVariables();
     
@@ -126,16 +127,13 @@ Int_t SoLIDGEMTracker::Decode( const THaEvData& evdata)
             
             Double_t thisDist = sqrt( pow(mcX - thisHit->GetX(), 2) 
                                    +  pow(mcY - thisHit->GetY(), 2) );
-            if (!fDoCombineHits && thisDist < dist){
+            if ( thisDist < dist){
                 dist = thisDist;
                 closeHit = thisHit;
             }
-            else if (fDoCombineHits){
-                new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*thisHit);
-            }
           }
       }
-      
+      if (closeHit != NULL && closeHit->IsSignalHit()) closeHit->SetGoodMCHit(1);
       if (!fDoCombineHits && closeHit != NULL){
         new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*closeHit);
       }
@@ -144,12 +142,13 @@ Int_t SoLIDGEMTracker::Decode( const THaEvData& evdata)
   }
   if (!fDoCombineHits) assert(nHit <= countMC); //for each MC hit, there is at most one cloest hit
 #endif
-  
+  if (fDoCombineHits) CombineChamberHits();
   return 1;
 }
 //_________________________________________________________________________________________
 THaAnalysisObject::EStatus SoLIDGEMTracker::Init( const TDatime& date )
 {
+  cout<<"Initializing tracker "<<fTrackerID<<endl;
   EStatus status = THaAnalysisObject::Init(date);
   if (status == kOK){
     //fGEMChamber = new SoLIDGEMChamber *[fNChamber];
@@ -217,7 +216,6 @@ Int_t SoLIDGEMTracker::ReadDatabase( const TDatime& date )
   fNChamber = -1;
   fTrackerZ = -100;
   fDoCombineHits = -1;
-  cout<<"Initializing GEM tracker "<<fTrackerID<<endl;
   const DBRequest request[] = {
         { "nchamber",          &fNChamber,        kInt,     0, 0 },
         { "tracker_z",         &fTrackerZ,        kDouble,  0, 0 },
@@ -268,7 +266,8 @@ Int_t SoLIDGEMTracker::DefineVariables( EMode mode )
       { "hit2D.vmcpos",  "2D hit mc position on v",        "fHits.SoLIDMCGEMHit.GetVPosMC()"   },
       { "hit2D.phi",     "2D hit phi coordinate",          "fHits.SoLIDMCGEMHit.GetPhi()"      },
       { "hit2D.signal",  "if this hit is signal",          "fHits.SoLIDMCGEMHit.IsSignalHit()" },
-      { "hit2D.chamber", "2D hit chamber ID",              "fHits.SoLIDGEMHit.GetChamberID()"  },
+      { "hit2D.chamber", "2D hit chamber ID",              "fHits.SoLIDMCGEMHit.GetChamberID()"  },
+      { "hit2D.isgoodmc","if it is the closest to MC hit", "fHits.SoLIDMCGEMHit.IsGoodMCHit()" },
       { "u.occu",        "occupancy pass noise cut",       "GetUMeanOccu()"                   },
       { "v.occu",        "occupancy pass noise cut",       "GetVMeanOccu()"                   },
       { "u.rawoccu",    "deconvoluted occupancy for u",   "GetUMeanHitOccu()"                },
@@ -295,7 +294,7 @@ Int_t SoLIDGEMTracker::CombineChamberHits()
     for (Int_t j=0; j<fGEMChamber[i]->GetNHits(); j++){
 #ifdef MCDATA
        SoLIDMCGEMHit *thisHit = (SoLIDMCGEMHit*)hits->At(j);
-       if (!thisHit->IsSignalHit()) continue;
+       //if (!thisHit->IsSignalHit()) continue;
        new ( (*fHits)[nHit++]) SoLIDMCGEMHit(*thisHit);
 #endif
     }

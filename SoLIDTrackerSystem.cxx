@@ -56,6 +56,9 @@ SoLIDTrackerSystem::SoLIDTrackerSystem( const char* name, const char* desc, THaA
 #endif
 
   fFieldMap = SoLIDFieldMap::GetInstance();
+  fBPMX = 0.; fBPMY = 0.;
+  fHasInit = 0;
+
 }
 
 //_____________________________________________________________________________
@@ -65,7 +68,8 @@ SoLIDTrackerSystem::~SoLIDTrackerSystem()
     RemoveVariables();
   DeleteContainer(fGEMTracker);
   delete fTracks;
-  delete fECal;
+  //delete fECal;
+  DeleteObject(fECal);
   delete fTrackFinder;
 }
 //_____________________________________________________________________________
@@ -225,10 +229,12 @@ const char* const here = "SoLIDTrackerSystem::Decode";
 //_____________________________________________________________________________
 THaAnalysisObject::EStatus SoLIDTrackerSystem::Init( const TDatime& date )
 {
+  if (fHasInit == 1) return fStatus; // no need to init every time for each run
   assert( fCrateMap == 0 );
   fCrateMap = new THashTable(100);
   fCrateMap->SetOwner();
   EStatus status = THaTrackingDetector::Init(date);
+
   //all GEM trackers
   if (status == kOK){
     //fGEMTracker = new SoLIDGEMTracker *[fNTracker];
@@ -239,10 +245,12 @@ THaAnalysisObject::EStatus SoLIDTrackerSystem::Init( const TDatime& date )
       SoLIDGEMTracker *theTracker = new SoLIDGEMTracker(i, sn.str().c_str(),
                                                       sd.str().c_str(), this);
       fGEMTracker.push_back(theTracker);
-      status = fGEMTracker[i]->Init(date);
-      if( status ) break;
+      EStatus statuss = fGEMTracker[i]->Init(date);
+      if( statuss ) break;
     }
   }
+  
+  
   //the e-calorimeter
   if (status == kOK){
     stringstream sn, sd;
@@ -250,7 +258,7 @@ THaAnalysisObject::EStatus SoLIDTrackerSystem::Init( const TDatime& date )
       sd << "SoLID Electromagnetic Calorimeters ";
       fECal = new SoLIDECal(sn.str().c_str(), sd.str().c_str(), this);
   }
-  status = fECal->Init(date);
+  EStatus statusss = fECal->Init(date);
 
   delete fCrateMap; fCrateMap = 0;
   if( status ){
@@ -268,6 +276,7 @@ THaAnalysisObject::EStatus SoLIDTrackerSystem::Init( const TDatime& date )
   fTrackFinder->SetGEMDetector(fGEMTracker);
   fTrackFinder->SetECalDetector(fECal);
 
+  fHasInit = 1; //initialization finished, turn the flag on, not to init again
   return fStatus = kOK;
 }
 //_____________________________________________________________________________
@@ -315,7 +324,9 @@ Int_t SoLIDTrackerSystem::CoarseTrack( TClonesArray& /*tracks*/ )
     assert( dynamic_cast<MCTrack*>(fMCDecoder->GetMCTrack(0)) );
     MCTrack* trk = static_cast<MCTrack*>( fMCDecoder->GetMCTrack(0) );
     assert(trk);
-    fTrackFinder->SetBPM(trk->VX(), trk->VY());
+    fBPMX = trk->VX() + gRandom->Gaus(0., 3e-4);
+    fBPMY = trk->VY() + gRandom->Gaus(0., 3e-4);
+    fTrackFinder->SetBPM(fBPMX, fBPMY);
   }
 #endif
 
@@ -401,6 +412,8 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "track.backphi",         "phi at most front tracker",        "fTracks.SoLIDTrack.GetBackPhi()"},
       { "track.backx",           "r coor at most front tracker",     "fTracks.SoLIDTrack.GetBackX()"},
       { "track.backy",        "rphi coor at mostt fron tracker",  "fTracks.SoLIDTrack.GetBackY()"},
+      { "BPM.x",             "BPM measurement for x coordinate",  "fBPMX"                           },
+      { "BPM.y",             "BPM measurement for y coordinate",  "fBPMY"                           },
       { 0 }   
     };
     ret = DefineVarsFromList( nonmcvars, mode );
@@ -474,6 +487,18 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "track.3.chi2",         "delta chi2 of the 4th hit",      "fTracks.SoLIDMCTrack.GetHit3Chi2()"   },
       { "track.4.chi2",         "delta chi2 of the 5th hit",      "fTracks.SoLIDMCTrack.GetHit4Chi2()"   },
       { "track.5.chi2",         "delta chi2 of the 6th hit",      "fTracks.SoLIDMCTrack.GetHit5Chi2()"   },
+      { "track.0.qu",           "charge on u strips",             "fTracks.SoLIDMCTrack.GetHit0QU()"   },
+      { "track.1.qu",           "charge on u strips",             "fTracks.SoLIDMCTrack.GetHit1QU()"   },
+      { "track.2.qu",           "charge on u strips",             "fTracks.SoLIDMCTrack.GetHit2QU()"   },
+      { "track.3.qu",           "charge on u strips",             "fTracks.SoLIDMCTrack.GetHit3QU()"   },
+      { "track.4.qu",           "charge on u strips",             "fTracks.SoLIDMCTrack.GetHit4QU()"   },
+      { "track.5.qu",           "charge on u strips",             "fTracks.SoLIDMCTrack.GetHit5QU()"   },
+      { "track.0.qv",           "charge on v strips",             "fTracks.SoLIDMCTrack.GetHit0QV()"   },
+      { "track.1.qv",           "charge on v strips",             "fTracks.SoLIDMCTrack.GetHit1QV()"   },
+      { "track.2.qv",           "charge on v strips",             "fTracks.SoLIDMCTrack.GetHit2QV()"   },
+      { "track.3.qv",           "charge on v strips",             "fTracks.SoLIDMCTrack.GetHit3QV()"   },
+      { "track.4.qv",           "charge on v strips",             "fTracks.SoLIDMCTrack.GetHit4QV()"   },
+      { "track.5.qv",           "charge on v strips",             "fTracks.SoLIDMCTrack.GetHit5QV()"   },
       { "track.0.signal",  "1 if the hit is a signal",       "fTracks.SoLIDMCTrack.IsSignalHit0()"   },
       { "track.1.signal",  "1 if the hit is a signal",       "fTracks.SoLIDMCTrack.IsSignalHit1()"   },
       { "track.2.signal",  "1 if the hit is a signal",       "fTracks.SoLIDMCTrack.IsSignalHit2()"   },
@@ -495,13 +520,18 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "track.phi",            "azimuthal angle of the track",   "fTracks.SoLIDMCTrack.GetPhi()"},
       { "track.vertexz",        "vertex z of the track",          "fTracks.SoLIDMCTrack.GetVertexZ()"},
       { "track.angleflag",        "LA or FA angle detector",        "fTracks.SoLIDTrack.GetAngleFlag()"},
-      { "track.deltaecx",        "delta x ec",          "fTracks.SoLIDMCTrack.GetMomMax()"},
-      { "track.deltaecy",        "delta y ec",          "fTracks.SoLIDMCTrack.GetMomMin()"},
-      { "track.deltaece",        "delta E ec in %",          "fTracks.SoLIDMCTrack.GetThetaMin()"}, 
+      { "track.ecx",            " x ec",          "fTracks.SoLIDMCTrack.GetECX()"},
+      { "track.ecy",            " y ec",          "fTracks.SoLIDMCTrack.GetECY()"},
+      { "track.ece",            " E ec in %",          "fTracks.SoLIDMCTrack.GetECE()"},
+      { "track.ecex",           "ex ec",          "fTracks.SoLIDMCTrack.GetECEx()" },
+      { "track.ecey",           "ey ec",          "fTracks.SoLIDMCTrack.GetECEy()" },
       { "track.backtheta",       "theta at most front tracker",      "fTracks.SoLIDMCTrack.GetBackTheta()"},
       { "track.backphi",         "phi at most front tracker",        "fTracks.SoLIDMCTrack.GetBackPhi()"},
       { "track.backx",           "r coor at most front tracker",     "fTracks.SoLIDMCTrack.GetBackX()"},
       { "track.backy",        "rphi coor at mostt fron tracker",  "fTracks.SoLIDMCTrack.GetBackY()"},
+      { "BPM.x",             "BPM measurement for x coordinate",  "fBPMX"                           },
+      { "BPM.y",             "BPM measurement for y coordinate",  "fBPMY"                           },
+      { "track.selectflag",  "select flag",                        "fTracks.SoLIDMCTrack.GetSelectFlag()"},
       { 0 }
     };
     ret = DefineVarsFromList( mcvars, mode );

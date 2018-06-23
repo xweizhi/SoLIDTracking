@@ -225,21 +225,23 @@ void JPsiKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType type
         
             fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
                                                charge, stepSize, finalMomentum, finalPosition);
-            for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	            if (fCaloHits->at(ec_count).fECID != kFAEC) continue; //not FAEC hit
-	            if (sqrt( pow(finalPosition.X() - fCaloHits->at(ec_count).fXPos, 2) +  
-	                  pow(finalPosition.Y() - fCaloHits->at(ec_count).fYPos, 2) ) < 0.2 ) isSeed = true;
+            for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+                SoLIDCaloHit* thisCaloHit = (SoLIDCaloHit*)fCaloHits->At(ec_count);
+	            if (thisCaloHit->fECID != kFAEC) continue; //not FAEC hit
+	            if (sqrt( pow(finalPosition.X() - thisCaloHit->fXPos, 2) +  
+	                  pow(finalPosition.Y() - thisCaloHit->fYPos, 2) ) < 0.2 ) isSeed = true;
 	          } 
 		      }
 		      else if (type == kLAEC){
             fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
                                                charge, stepSize, finalMomentum, finalPosition);
-            for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	            if (fCaloHits->at(ec_count).fECID != kLAEC) continue; //not FAEC hit
-	            if (sqrt( pow(finalPosition.X() - fCaloHits->at(ec_count).fXPos, 2) +  
-	                  pow(finalPosition.Y() - fCaloHits->at(ec_count).fYPos, 2) ) < 0.06 ) isSeed = true;
-	          } 
-		      }
+            for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+                SoLIDCaloHit* thisCaloHit = (SoLIDCaloHit*)fCaloHits->At(ec_count);
+	            if (thisCaloHit->fECID != kLAEC) continue; //not FAEC hit
+	            if (sqrt( pow(finalPosition.X() - thisCaloHit->fXPos, 2) +  
+	                  pow(finalPosition.Y() - thisCaloHit->fYPos, 2) ) < 0.06 ) isSeed = true;
+	        } 
+		    }
 		      if (type == kFAEC && !isSeed) continue;
           
           
@@ -606,10 +608,11 @@ void JPsiKalTrackFinder::ECalFinalMatch()
     SoLKalTrackState *predictState = currentState.PredictSVatNextZ(ecalZ);
     
     thisSystem->SetTrackStatus(kFALSE);
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	    if (fCaloHits->at(ec_count).fECID != thisSystem->GetAngleFlag()) continue;
-	    if ( fabs(fCaloHits->at(ec_count).fXPos - (*predictState)(kIdxX0, 0)) <5.*0.01 &&
-	         fabs(fCaloHits->at(ec_count).fYPos - (*predictState)(kIdxY0, 0)) <5.*0.01  ){
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+        SoLIDCaloHit* thisHit = (SoLIDCaloHit*)fCaloHits->At(ec_count);
+	    if (thisHit->fECID != thisSystem->GetAngleFlag()) continue;
+	    if ( fabs(thisHit->fXPos - (*predictState)(kIdxX0, 0)) <5.*0.01 &&
+	         fabs(thisHit->fYPos - (*predictState)(kIdxY0, 0)) <5.*0.01  ){
 	      
 	      //for large angle, require also that the momentum of the track needs to match the 
 	      //cluster energy. This is difficult to do for forward angle since we detect both hadron
@@ -618,13 +621,13 @@ void JPsiKalTrackFinder::ECalFinalMatch()
 	      //and field integral to measure it
 	      Double_t momentum = thisSystem->GetCharge() / (*predictState)(kIdxQP, 0);
 	      if (thisSystem->GetAngleFlag() == kLAEC){
-	        if ( fabs( (momentum - fCaloHits->at(ec_count).fEdp) / momentum) > 0.5) continue;
+	        if ( fabs( (momentum - thisHit->fEdp) / momentum) > 0.5) continue;
 	      }
 	      
 	      thisSystem->SetTrackStatus(kTRUE);
-	      thisSystem->fDeltaECX = fCaloHits->at(ec_count).fXPos - (*predictState)(kIdxX0, 0);
-	      thisSystem->fDeltaECY = fCaloHits->at(ec_count).fYPos - (*predictState)(kIdxY0, 0);
-	      thisSystem->fDeltaECE = (momentum - fCaloHits->at(ec_count).fEdp)/momentum;    
+	      thisSystem->fDeltaECX = thisHit->fXPos;// - (*predictState)(kIdxX0, 0);
+	      thisSystem->fDeltaECY = thisHit->fYPos;// - (*predictState)(kIdxY0, 0);
+	      thisSystem->fDeltaECE = thisHit->fEdp;    
 	    }
 	  }
 	  
@@ -679,11 +682,12 @@ inline SoLKalTrackSite & JPsiKalTrackFinder::SiteInitWithSeed(DoubletSeed* thisS
 inline Bool_t JPsiKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType type)
 {
   if (type == kLAEC){
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++){
-	    if (fCaloHits->at(ec_count).fECID != kLAEC) continue; //not LAEC hit
-	    Double_t ecHitPhi = TMath::ATan2(fCaloHits->at(ec_count).fYPos, fCaloHits->at(ec_count).fXPos);
-	    Double_t ecHitR = TMath::Sqrt( TMath::Power(fCaloHits->at(ec_count).fXPos, 2) + 
-	    			  	   TMath::Power(fCaloHits->at(ec_count).fYPos, 2) );
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+        SoLIDCaloHit* thisHit = (SoLIDCaloHit*)fCaloHits->At(ec_count);
+	    if (thisHit->fECID != kLAEC) continue; //not LAEC hit
+	    Double_t ecHitPhi = TMath::ATan2(thisHit->fYPos, thisHit->fXPos);
+	    Double_t ecHitR = TMath::Sqrt( TMath::Power(thisHit->fXPos, 2) + 
+	    			  	   TMath::Power(thisHit->fYPos, 2) );
 	    Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	    Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
 	    if (theHit->GetTrackerID()==2 && (tmpDeltaPhi < 0.15 && tmpDeltaPhi > -0.05) && (tmpDeltaR < 0.286 && tmpDeltaR > 0.095)){
@@ -694,12 +698,13 @@ inline Bool_t JPsiKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType type)
 	  }
   }
   else if (type == kFAEC){
-    for (UInt_t ec_count=0; ec_count<fCaloHits->size(); ec_count++)
+    for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++)
 	    {
-	      if (fCaloHits->at(ec_count).fECID != kFAEC) continue; //not FAEC hit
-	      Double_t ecHitPhi = TMath::ATan2(fCaloHits->at(ec_count).fYPos, fCaloHits->at(ec_count).fXPos);
-	      Double_t ecHitR = TMath::Sqrt( TMath::Power(fCaloHits->at(ec_count).fXPos, 2) + 
-				  	   TMath::Power(fCaloHits->at(ec_count).fYPos, 2) );
+	      SoLIDCaloHit* thisHit = (SoLIDCaloHit*)fCaloHits->At(ec_count); 
+	      if (thisHit->fECID != kFAEC) continue; //not FAEC hit
+	      Double_t ecHitPhi = TMath::ATan2(thisHit->fYPos, thisHit->fXPos);
+	      Double_t ecHitR = TMath::Sqrt( TMath::Power(thisHit->fXPos, 2) + 
+				  	   TMath::Power(thisHit->fYPos, 2) );
 	      Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	      Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
 	      if (theHit->GetTrackerID()==4 && (tmpDeltaPhi < 1.4 && tmpDeltaPhi > -0.1) && (tmpDeltaR < 1.2 && tmpDeltaR > 0.2)){
@@ -781,9 +786,9 @@ inline void JPsiKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSyste
   soltrack->SetVertexZ(kaltrack->GetVertexZ());
   soltrack->SetPhi(kaltrack->GetPhi());
   soltrack->SetTheta(kaltrack->GetTheta());
-  soltrack->SetMomMax(kaltrack->fDeltaECX);
-  soltrack->SetMomMin(kaltrack->fDeltaECY);
-  soltrack->SetThetaMin(kaltrack->fDeltaECE);
+  soltrack->SetECX(kaltrack->fDeltaECX);
+  soltrack->SetECY(kaltrack->fDeltaECY);
+  soltrack->SetECE(kaltrack->fDeltaECE);
   
   //start from 1 because the 0th is the dummy site that we used to initialize Kalman Filter
   //TODO remember not to add the last one since later it will be the BPM, not GEM hit

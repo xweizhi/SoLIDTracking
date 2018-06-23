@@ -93,7 +93,13 @@ Double_t SoLIDTrack::GetHitInfo(UInt_t i, UInt_t type) const
   }
   else if (type == 14){
   	return fHits.at(i)->GetDeltaChi2();
-  } 
+  }
+  else if (type == 15){
+    return fHits.at(i)->GetQU();
+  }
+  else if (type == 16){
+    return fHits.at(i)->GetQV();
+  }
 
   else { return 0; }
   
@@ -113,7 +119,7 @@ void SoLIDTrack::SortHits()
 #ifdef MCDATA
 Double_t SoLIDMCTrack::GetMCHitInfo(UInt_t i, UInt_t type) const 
 {
-  while (i>= fHits.size()) { i -= fHits.size(); } 
+  while (i>= fHits.size()) { i = fHits.size()-1; } 
   
   if (type == 0){ //x coordinate info for the ith hit
     return dynamic_cast<SoLIDMCGEMHit*>(fHits.at(i))->IsSignalHit();

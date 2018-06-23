@@ -171,13 +171,17 @@ class SoLIDGEMReadOut;
     public:
     SoLIDMCGEMHit() {};
     SoLIDMCGEMHit(Int_t chamberID, Int_t trackerID, Double_t r, Double_t phi, Double_t z, Hit* uhit, Hit* vhit) :
-    SoLIDGEMHit(chamberID, trackerID, r, phi, z, uhit, vhit) {};
+    SoLIDGEMHit(chamberID, trackerID, r, phi, z, uhit, vhit) { fIsGoodMCHit = 0; };
     ~SoLIDMCGEMHit(){};
     
-    Int_t IsSignalHit(); 
+    Int_t IsSignalHit();
+    void  SetGoodMCHit(Int_t a) { fIsGoodMCHit = a; }
+    Int_t IsGoodMCHit()  const { return fIsGoodMCHit; }
     Double_t GetUPosMC() const { return dynamic_cast<SoLIDMCRawHit*>(fUHit)->fMCPos; }
     Double_t GetVPosMC() const { return dynamic_cast<SoLIDMCRawHit*>(fVHit)->fMCPos; }
     
+    protected:
+    Int_t fIsGoodMCHit;
     ClassDef(SoLIDMCGEMHit, 1)
   };
 #endif

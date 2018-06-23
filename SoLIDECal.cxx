@@ -10,25 +10,34 @@
 //SoLIDTracking
 #include "SoLIDECal.h"
 #include "SoLIDTrackerSystem.h"
-
+ClassImp(SoLIDECal)
 
 //________________________________________________________________________________________
 SoLIDECal::SoLIDECal( const char* name, const char* description,
                                  THaDetectorBase* parent)
 :THaSubDetector(name,description,parent),
 fIsLAECTriggered(kFALSE), fIsFAECTriggered(kFALSE), fLAECEdpCut(0.), fFAECEdpCut(0.)
-{}
+{
+  static const char* const here = "SoLIDECal";
+  assert( name && parent );
+  fCaloHits = new TClonesArray("SoLIDCaloHit", 10);
+
+}
 //________________________________________________________________________________________
 SoLIDECal::~SoLIDECal()
-{}
+{
+  if( fIsSetup )
+    RemoveVariables();
+  delete fCaloHits;
+}
 //________________________________________________________________________________________
-void SoLIDECal::Clear(Option_t* /*opt*/)
+void SoLIDECal::Clear(Option_t* opt)
 {
   fNLAECHits = 0;
   fNFAECHits = 0;
   fIsLAECTriggered = kFALSE;
   fIsFAECTriggered = kFALSE;
-  fCaloHits.clear();
+  fCaloHits->Clear(opt);
 }
 //________________________________________________________________________________________
 Int_t SoLIDECal::Decode(const THaEvData& evdata)
@@ -98,18 +107,22 @@ Int_t SoLIDECal::Decode(const THaEvData& evdata)
   fNLAECHits = laecXPos.size();
   fNFAECHits = faecXPos.size();
   
-  for (unsigned int i=0; i<fNLAECHits; i++) fCaloHits.push_back(SoLIDCaloHit( laecXPos.at(i), laecYPos.at(i), 
-								     kLAEC,  laecEdp.at(i)));
-
-  for (unsigned int i=0; i<fNFAECHits; i++) fCaloHits.push_back(SoLIDCaloHit( faecXPos.at(i), faecYPos.at(i), 
-								     kFAEC,  faecEdp.at(i)));
+  for (unsigned int i=0; i<fNLAECHits; i++) 
+    new ( (*fCaloHits)[i]) SoLIDCaloHit( laecXPos.at(i), laecYPos.at(i), kLAEC,  laecEdp.at(i));
+  
+  
+  for (unsigned int i=0; i<fNFAECHits; i++)
+    new ( (*fCaloHits)[i+fNLAECHits]) SoLIDCaloHit(faecXPos.at(i), faecYPos.at(i), kFAEC,  faecEdp.at(i));
+  
   
   return kOK;
 }
 //________________________________________________________________________________________
 THaAnalysisObject::EStatus SoLIDECal::Init( const TDatime& date )
 {
+
   EStatus status = THaAnalysisObject::Init(date);
+
   if( status ){
   return fStatus = status;
   }
@@ -218,6 +231,7 @@ Int_t SoLIDECal::ReadDatabase( const TDatime& date )
   fMRPCPhiCover = 2.*TMath::Pi() / fMRPCNSectors;
 #endif
   fIsInit = kTRUE;
+
   return kOK;
 }
 //___________________________________________________________________________________________________
@@ -226,7 +240,17 @@ Int_t SoLIDECal::DefineVariables( EMode mode )
   if( mode == kDefine && fIsSetup ) return kOK;
   fIsSetup = ( mode == kDefine );
   
-  return kOK;
+  Int_t ret;
+  RVarDef nonmcvars[] = {
+      { "hitCalo.x",       "hit x coordinate on EC",          "fCaloHits.SoLIDCaloHit.fXPos"         },
+      { "hitCalo.y",       "hit y coordinate on EC",          "fCaloHits.SoLIDCaloHit.fYPos"         },
+      { "hitCalo.id",      "EC id of the hit",                "fCaloHits.SoLIDCaloHit.fECID"         },
+      { "hitCalo.E",       "hit energy measurement on EC",    "fCaloHits.SoLIDCaloHit.fEdp"          },
+      { 0 }
+    };
+  ret = DefineVarsFromList( nonmcvars, mode );
+  
+  return ret;
 }
 //___________________________________________________________________________________________________
 void SoLIDECal::SmearPosition(Float_t *x, Float_t *y, Int_t mode)

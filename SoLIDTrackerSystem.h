@@ -114,7 +114,9 @@ class SoLIDTrackerSystem : public THaTrackingDetector {
     Int_t          fNTracker;       //total number of GEM detectors in this system SIDIS:6, PVDIS:5
     Double_t       fChi2Cut;        //chi2 cut after fitting the track
     Int_t          fNMaxMissHit;    //maximum number of hits that is allowed in the coarse tracking
-    
+    Double_t       fBPMX;
+    Double_t       fBPMY;
+    Int_t          fHasInit;        //flag indicate that the system has initialized
     
     SoLKalTrackFinder* fTrackFinder; 
 #ifdef MCDATA

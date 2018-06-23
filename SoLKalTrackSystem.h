@@ -86,6 +86,8 @@ class SoLKalTrackSystem : public TObjArray {
 
   Double_t     fDeltaECX;
   Double_t     fDeltaECY;
+  Double_t     fDeltaECEx;
+  Double_t     fDeltaECEy;
   Double_t     fDeltaECE;
 
   private:
