@@ -34,7 +34,7 @@ class SIDISKalTrackFinder : public SoLKalTrackFinder, public THaAnalysisObject
 {
   public:
   SIDISKalTrackFinder() {;}
-  SIDISKalTrackFinder(bool isMC, const char* name = "SIDISTrackFinder");
+  SIDISKalTrackFinder(bool isMC, const char* name = "SIDISTrackFinder", int detConf = 0);
   ~SIDISKalTrackFinder();
   
   void ProcessHits(TClonesArray* theTracks);
@@ -82,6 +82,7 @@ class SIDISKalTrackFinder : public SoLKalTrackFinder, public THaAnalysisObject
   vector<SoLIDGEMHit*> fWindowHits;
   map< Int_t, vector<SoLIDGEMHit*> > fGoodHits;
   Int_t fNGoodTrack;
+  Int_t fDetConf;
   
   Double_t fMomMinCut[2];
   Double_t fMomMaxCut[2];

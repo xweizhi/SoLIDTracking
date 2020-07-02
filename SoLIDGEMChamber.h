@@ -46,7 +46,8 @@ class SoLIDGEMChamber : public THaSubDetector{
   TSeqCollection*   GetHits() const { return fHits; }
   Double_t          GetPhiInLab() { return fPhiInLab; }
   
-  void              UVtoCylinCoor(Double_t upos, Double_t vpos, Double_t* r, Double_t* phi);
+  void              UVtoCartesian(Double_t upos, Double_t vpos, 
+                                  Double_t& x, Double_t& y, Double_t& r, Double_t& phi);
   Bool_t            CartesianToUV(Double_t &x, Double_t &y, Double_t &u, Double_t &v);
 
   //TSeqCollection*   GetRawHits(Int_t i) const { return fGEMReadOut[i]->GetHits(); }
@@ -72,6 +73,9 @@ class SoLIDGEMChamber : public THaSubDetector{
   void              RotateToLab(Double_t *phi);
   void              RotateToChamber(Double_t *phi);
   Bool_t            Contains(Double_t *r, Double_t *phi);
+  Bool_t            ContainsEdge(Double_t x, Double_t y);
+  Bool_t            HasIntersect(Short_t uChanID, Short_t vChanID);
+  void              GetStripEndPoint(int proj, int type, int chan, double* x, double* y);
 
   Int_t             fChamberID;    //sector is the same as chamber, but chamber sounds nicer IMO
   Int_t             fParentTrackerID;
@@ -101,7 +105,11 @@ class SoLIDGEMChamber : public THaSubDetector{
 
   TVector3          fChamberCenter;
   
-  TH2F*              fAcceptHist;
+  TH2F*             fAcceptHist;
+  
+  Int_t             fHasDivSeg;
+  Double_t          fDivSegX[4];
+  Double_t          fDivSegY[4];
 
   std::vector<SoLIDGEMReadOut*> fGEMReadOut; //The readout plane that the chamber has, usually 2
   ClassDef(SoLIDGEMChamber,0)

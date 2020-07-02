@@ -57,14 +57,18 @@ class SoLIDGEMReadOut : public THaSubDetector{
   TSeqCollection*   GetHits()        const { return fHits; }
   Int_t             GetNhits()       const { return fHits->GetLast()+1; }
   Double_t          GetResolution()  const { return fResolution; }
-  Int_t             GetNSigStrips()  const { return fSigStrips.size(); }
+  Int_t             GetNSigStrips()  const { return fSigStrips[0].size() + fSigStrips[1].size(); }
   Double_t          GetPitch() const { return fStripPitch; }
   Double_t          GetOccupancy() const { return fOccupancy; }
   Double_t          GetHitOccupancy() const { return fHitOcc; }
+  Int_t             GetNStrips() const {return fNStrip; }
   Bool_t            IsNoisyEvent() {
     if ( (fHits->GetLast()+1) >= fMaxHits) return kTRUE;
     else return kFALSE;
   }
+  Double_t          GetChanPos(Int_t ichan);
+  bool              IsStripDivided(Int_t ichan);
+  Int_t             GetBaseStripID(Int_t ichan);
   
   protected:
   
@@ -99,6 +103,9 @@ class SoLIDGEMReadOut : public THaSubDetector{
   Double_t          fDPhi;            //
   Double_t          fStartPos;        // Starting position of the readout strips
   Int_t             fNStrip;          // total number of strips on this readout
+  Int_t             fNDivStrip;       // total number of divided strips on this readout
+  Int_t             fNChan;           // total number of channel
+  Int_t             fDivStart;        // id of the first strip that is divided
   Vflt_t            fPed;             // pedestal for each channal
   Int_t             fDeconMode;       // 1 if the APV25 chip is in the deconvolution mode
   Int_t             fKillCrossTalk;   // 1 to apply cross talk signal elimination algorithm
@@ -113,7 +120,7 @@ class SoLIDGEMReadOut : public THaSubDetector{
   Float_t*          fADCcor;          // [fNelem] fADC corrected for pedestal & noise
   Byte_t*           fGoodHit;         // [fNelem] Strip data passed pulse shape test
   Double_t          fDNoise;          // Event-by-event noise (avg below fMinAmpl)
-  Vint_t            fSigStrips;       // Ordered strip numbers with signal (adccor > minampl)
+  Vint_t            fSigStrips[2];       // Ordered strip numbers with signal (adccor > minampl)
   Vbool_t           fStripsSeen;      // Flags for duplicate strip number detection
 
   UInt_t            fNRawStrips;      // Statistics: strips with any data

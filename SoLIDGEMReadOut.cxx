@@ -26,7 +26,7 @@ static const Int_t kMaxNChan = 20000;
 SoLIDGEMReadOut::SoLIDGEMReadOut(Int_t ireadout, const char* name, const char* description,
                                  THaDetectorBase* parent)
   : THaSubDetector(name,description,parent), fReadOutID(ireadout), fADCraw(0), fADC(0), 
-  fHitTime(0), fADCcor(0), fGoodHit(0), fDNoise(0), fSigStrips(0), fStripsSeen(0), 
+  fHitTime(0), fADCcor(0), fGoodHit(0), fDNoise(0), fStripsSeen(0), 
   fNRawStrips(0), fNHitStrips(0), fHitOcc(0), fOccupancy(0), fHits(0), fMapType(kOneToOne), 
   fADCMap(0)
 #ifdef MCDATA
@@ -52,6 +52,8 @@ SoLIDGEMReadOut::SoLIDGEMReadOut(Int_t ireadout, const char* name, const char* d
     MakeZombie();
     return;
   }
+  fSigStrips[0].clear();
+  fSigStrips[1].clear();
 
 }
 //_________________________________________________________________________________________
@@ -78,13 +80,14 @@ void SoLIDGEMReadOut::Clear( Option_t* opt)
 {
   assert( fIsInit );
   assert( fADCraw and fADC and fHitTime and fADCcor and fGoodHit );
-  memset( fADCraw, 0, fNStrip*sizeof(Float_t) );
-  memset( fADC, 0, fNStrip*sizeof(Float_t) );
-  memset( fHitTime, 0, fNStrip*sizeof(Float_t) );
-  memset( fADCcor, 0, fNStrip*sizeof(Float_t) );
-  memset( fGoodHit, 0, fNStrip*sizeof(Byte_t) );
-  fSigStrips.clear();
-  fStripsSeen.assign( fNStrip, false );
+  memset( fADCraw, 0, fNChan*sizeof(Float_t) );
+  memset( fADC, 0, fNChan*sizeof(Float_t) );
+  memset( fHitTime, 0, fNChan*sizeof(Float_t) );
+  memset( fADCcor, 0, fNChan*sizeof(Float_t) );
+  memset( fGoodHit, 0, fNChan*sizeof(Byte_t) );
+  fSigStrips[0].clear();
+  fSigStrips[1].clear();
+  fStripsSeen.assign( fNChan, false );
   
   fNHitStrips = fNRawStrips = 0;
   fHitOcc = fOccupancy = fDNoise = 0.0;
@@ -128,9 +131,10 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
     assert( fHitMap != 0 and fADCMap != 0 );
 #endif
   assert( fPed.empty() or
-          fPed.size() == static_cast<Vflt_t::size_type>(fNStrip) );
-  assert( fSigStrips.empty() );
-  assert( fStripsSeen.size() == static_cast<Vbool_t::size_type>(fNStrip) );
+          fPed.size() == static_cast<Vflt_t::size_type>(fNChan) );
+  assert( fSigStrips[0].empty() );
+  assert( fSigStrips[1].empty() );
+  assert( fStripsSeen.size() == static_cast<Vbool_t::size_type>(fNChan) );
 
   UInt_t nHits = 0;
 
@@ -166,7 +170,7 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
       Int_t istrip =
 	    MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
       // Test for duplicate istrip, if found, warn and skip
-      assert( istrip >= 0 and istrip < fNStrip );
+      assert( istrip >= 0 and istrip < fNChan );
       if( fStripsSeen[istrip] ) {
       const char* inp_source = "DAQ";
 #ifdef MCDATA
@@ -194,8 +198,10 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
 	for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
 	  Float_t fsamp = static_cast<Float_t>
 	    ( evdata.GetData(d->crate, d->slot, chan, isamp) );
+          //if (istrip >= fNStrip) fsamp = 0.; 
 	  samples.push_back( fsamp );
 	}
+        //cout<<istrip<<" "<<samples[2]<<" "<<fReadOutID<<endl;
 	// Analyze the pulse shape
 	if (fDeconMode == 1){
             stripdata = ChipChargeDep(samples);
@@ -259,15 +265,16 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
       assert( fDNoise < fADCMin );
     }
     // Save strip numbers of corrected ADC data above threshold. Fill histograms.
-    assert( fSigStrips.empty() );
-    for( Int_t i = 0; i < fNStrip; i++ ) {
+    assert( fSigStrips[0].empty() );
+    assert( fSigStrips[1].empty() );
+    for( Int_t i = 0; i < fNChan; i++ ) {
       fADCcor[i] -= fDNoise;
       AddStrip( i );
     }
   }
 
-  fHitOcc    = static_cast<Double_t>(fNHitStrips) / fNStrip;
-  fOccupancy = static_cast<Double_t>(GetNSigStrips()) / fNStrip;
+  fHitOcc    = static_cast<Double_t>(fNHitStrips) / fNChan;
+  fOccupancy = static_cast<Double_t>(GetNSigStrips()) / fNChan;
   
    // Find and analyze clusters. Clusters of active strips are considered
   // a "Hit".
@@ -297,205 +304,232 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
   // by (1+frac), so frac = 0.1 means: trigger on a rise above 110% etc.
 
   // The active strip numbers must be sorted for the clustering algorithm
-  sort( ALL(fSigStrips) );
-
-  Double_t frac_down = 1.0 - fSplitFrac, frac_up = 1.0 + fSplitFrac;
-  #ifndef NDEBUG
-  SoLIDRawHit* prevHit = 0;
-#endif
+  if (fSigStrips[0].size() == 0 && fSigStrips[1].size() == 0) return 1;
+  sort( ALL(fSigStrips[0]) );
+  sort( ALL(fSigStrips[1]) );
   typedef Vint_t::iterator viter_t;
-  Vint_t splits;  // Strips with ampl split between 2 clusters
-  viter_t next = fSigStrips.begin();
-  while( next != fSigStrips.end() ) {
-    viter_t start = next, cur = next;
-    ++next;
-    assert( next == fSigStrips.end() or *next > *cur );
-    while( next != fSigStrips.end() and (*next - *cur) == 1  ) {
-      ++cur;
-      ++next;
-    }
-    // Now the cluster candidate is between start and cur
-    assert( *cur >= *start );
-    // The "type" parameter indicates the result of the cluster analysis:
-    // 0: clean (i.e. smaller than fMaxClusterSize, no further analysis)
-    // 1: large, maximum at right edge, not split
-    // 2: large, no clear minimum on the right side found, not split
-    // 3: split, well-defined peak found (may still be larger than maxsize)
-    Int_t  type = 0;
-    UInt_t size = *cur - *start + 1;
-    if( size > (UInt_t)fMaxClusterSize ) {
-      Double_t maxadc = 0.0, minadc = kBig;
-      viter_t it = start, maxpos = start, minpos = start;
-      enum EStep { kFindMax = 1, kFindMin, kDone };
-      EStep step = kFindMax;
-      while( step != kDone and it != next ) {
-        Double_t adc = fADCcor[*it];
-        switch( step ) {
-          case kFindMax:
-            // Looking for maximum
-            if( adc > maxadc ) {
-              maxpos = it;
-              maxadc = adc;
-            } else if( adc < maxadc * frac_down) {
-              assert( maxadc > 0.0 );
-              step = kFindMin;
-              continue;
-            }
-            break;
-          case kFindMin:
-            // Looking for minimum
-            if( adc < minadc ) {
-              minpos = it;
-              minadc = adc;
-            } else if( adc > minadc * frac_up) {
-              assert( minadc < kBig );
-              step = kDone;
-            }
-            break;
-          case kDone:
-            assert( false );  // should never get here
-            break;
-        }
-        ++it;
-      }
-      if( step == kDone ) {
-        // Found maximum followed by minimum
-        assert( minpos != start );
-        assert( minpos != cur );
-        assert( *minpos > *maxpos );
-        // Split the cluster at the position of the minimum, assuming that
-        // the strip with the minimum amplitude is shared between both clusters
-        cur  = minpos;
-        next = minpos;
-        // In order not to double-count amplitude, we split the signal height
-        // of that strip evenly between the two clusters. This is a very
-        // crude way of doing what we really should be doing: "fitting" a peak
-        // shape and using the area and centroid of the curve
-	fADCcor[*minpos] /= 2.0;
-	splits.push_back(*minpos);
-      }
-      type = step;
-      size = *cur - *start + 1;
-      assert( *cur >= *start );
-    }
-    assert( size > 0 );
-    // Compute weighted position average. Again, a crude (but fast) substitute
-    // for fitting the centroid of the peak.
-    Double_t xsum = 0.0, adcsum = 0.0;
-#ifdef MCDATA
-    Double_t mcpos = 0.0, mctime = kBig;
-    Int_t mctrack = 0, num_bg = 0;
-#endif
-    for( ; start != next; ++start ) {
-      Int_t istrip = *start;
-      Double_t pos = GetStart() + istrip * GetPitch();
-      Double_t adc = fADCcor[istrip];
-      xsum   += pos * adc;
-      adcsum += adc;
-#ifdef MCDATA
-      // If doing MC data, analyze the strip truth information
-      if( mc_data ) {
-	MCHitInfo& mc = fMCHitInfo[istrip];
-	// This may be smaller than the actual total number of background hits
-	// contributing to the entire cluster, but counting them would involve
-	// lists of secondary particle numbers ... overkill for now
-	num_bg = TMath::Max( num_bg, mc.fContam );
-	// All primary particle hits in the cluster are from the same track
-	//assert( mctrack == 0 || mc.fMCTrack == 0 || mctrack == mc.fMCTrack );
+  Double_t frac_down = 1.0 - fSplitFrac, frac_up = 1.0 + fSplitFrac;
 
-    //fMCTrack > 0 means signal hit, the value is actually the track ID
-    //fMCTrack == 0 means background hit
-    //fMCTrack == -1 means it is induced hit on the readout strip
-
-	if( mctrack == 0 ) {
-	  if( mc.fMCTrack > 0 ) {
-	    // If the cluster contains a signal hit, save its info and be done
-	    mctrack = mc.fMCTrack;
-	    mcpos   = mc.fMCPos;
-	    mctime  = mc.fMCTime;
-	  }
-	  else if (mc.fMCTrack == 0){
-	    // If background hits only, compute position average
-	    mcpos  += mc.fMCPos;
-	    mctime  = TMath::Min( mctime, mc.fMCTime );
-	  }else{
-        assert(mc.fMCTrack == -1); //induced strip, cannot be anything else
-        mcpos  += pos; //no other avaiable information for induced strip
-        //no timing information right now for induced strip as well
-      }
-	}
-      }
-#endif // MCDATA
-    }
-    assert( adcsum > 0.0 );
-    Double_t pos = xsum/adcsum;
-
-#ifdef MCDATA
-    if( mc_data && mctrack == 0 ) {
-      mcpos /= static_cast<Double_t>(size);
-    }
-#endif
-    // The resolution (sigma) of the position measurement depends on the
-    // cluster size. In particular, if the cluster consists of only a single
-    // hit, the resolution is much reduced
-    Double_t resolution = fResolution;
-    if (type == 3) resolution *= 2.;
-    if( size == 1 ) {
-      resolution = TMath::Max( 0.25*GetPitch(), fResolution );
-      // The factor of 1/2*pitch is just a guess. Since with real GEMs
-      // there _should_ always be more than one strip per cluster, we must
-      // assume that the other strip(s) did not fire due to inefficiency.
-      // As a result, the error is bigger than it would be if only ever one
-      // strip fired per hit.
-//       resolution = TMath::Max( 0.5*GetPitch(), 2.0*fResolution );
-//     } else if( size == 2 ) {
-//       // Again, this is a guess, to be quantified with Monte Carlo
-//       resolution = 1.2*fResolution;
-    }
-
-    // Make a new hit
-#ifndef NDEBUG
-    SoLIDRawHit* theHit = 0;
-#endif
-#ifdef MCDATA
-    if( !mc_data ) {
-#endif
-#ifndef NDEBUG
-      theHit =
-#endif
-	new( (*fHits)[nHits++] ) SoLIDRawHit( pos,
-					 adcsum,
-					 size,
-					 type,
-					 resolution,
-					 this
-					 );
-#ifdef MCDATA
-    } else {
-      // Monte Carlo data
-#ifndef NDEBUG
-      theHit =
-#endif
-	new( (*fHits)[nHits++] ) SoLIDMCRawHit( pos,
-					   adcsum,
-					   size,
-					   type,
-					   resolution,
-					   this,
-					   mctrack,
-					   mcpos,
-					   mctime,
-					   num_bg
-					   );
-    }
-#endif // MCDATA
-#ifndef NDEBUG
-    // Ensure hits are ordered by position (should be guaranteed by std::map)
-    assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
-    prevHit = theHit;
-#endif
+  /*cout<<"print strip info"<<endl;
+  for (int sc = 0; sc < 2; sc++){
+    for (unsigned int i=0; i<fSigStrips[sc].size(); i++)
+    cout<<sc<<" "<<fSigStrips[sc][i]<<" "<<fADCcor[fSigStrips[sc][i]]<<endl;
   }
+  cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl; 
+  */
 
+  for (Int_t sc = 0; sc<2; sc++){
+      if (fSigStrips[sc].size() == 0) continue;
+
+      #ifndef NDEBUG
+      SoLIDRawHit* prevHit = 0;
+    #endif
+      Vint_t splits;  // Strips with ampl split between 2 clusters
+      viter_t next = fSigStrips[sc].begin();
+      while( next != fSigStrips[sc].end() ) {
+        viter_t start = next, cur = next;
+        ++next;
+
+        assert( next == fSigStrips[sc].end() or *next > *cur );
+        while( next != fSigStrips[sc].end() and (*next - *cur) == 1  ) {
+          ++cur;
+          ++next;
+        }
+        // Now the cluster candidate is between start and cur
+        assert( *cur >= *start );
+        // The "type" parameter indicates the result of the cluster analysis:
+        // 0: clean (i.e. smaller than fMaxClusterSize, no further analysis)
+        // 1: large, maximum at right edge, not split
+        // 2: large, no clear minimum on the right side found, not split
+        // 3: split, well-defined peak found (may still be larger than maxsize)
+        Int_t  type = 0;
+        UInt_t size = *cur - *start + 1;
+        if( size > (UInt_t)fMaxClusterSize ) {
+          Double_t maxadc = 0.0, minadc = kBig;
+          viter_t it = start, maxpos = start, minpos = start;
+          enum EStep { kFindMax = 1, kFindMin, kDone };
+          EStep step = kFindMax;
+          while( step != kDone and it != next ) {
+            Double_t adc = fADCcor[*it];
+            switch( step ) {
+              case kFindMax:
+                // Looking for maximum
+                if( adc > maxadc ) {
+                  maxpos = it;
+                  maxadc = adc;
+                } else if( adc < maxadc * frac_down) {
+                  assert( maxadc > 0.0 );
+                  step = kFindMin;
+                  continue;
+                }
+                break;
+              case kFindMin:
+                // Looking for minimum
+                if( adc < minadc ) {
+                  minpos = it;
+                  minadc = adc;
+                } else if( adc > minadc * frac_up) {
+                  assert( minadc < kBig );
+                  step = kDone;
+                }
+                break;
+              case kDone:
+                assert( false );  // should never get here
+                break;
+            }
+            ++it;
+          }
+          if( step == kDone ) {
+            // Found maximum followed by minimum
+            assert( minpos != start );
+            assert( minpos != cur );
+            assert( *minpos > *maxpos );
+            // Split the cluster at the position of the minimum, assuming that
+            // the strip with the minimum amplitude is shared between both clusters
+            cur  = minpos;
+            next = minpos;
+            // In order not to double-count amplitude, we split the signal height
+            // of that strip evenly between the two clusters. This is a very
+            // crude way of doing what we really should be doing: "fitting" a peak
+            // shape and using the area and centroid of the curve
+	    fADCcor[*minpos] /= 2.0;
+	    splits.push_back(*minpos);
+          }
+          type = step;
+          size = *cur - *start + 1;
+          assert( *cur >= *start );
+        }
+        assert( size > 0 );
+        // Compute weighted position average. Again, a crude (but fast) substitute
+        // for fitting the centroid of the peak.
+        Double_t xsum = 0.0, adcsum = 0.0;
+        Short_t  maxID = -1;
+        Double_t maxSave = 1e-9;
+    #ifdef MCDATA
+        Double_t mcpos = 0.0, mctime = kBig;
+        Int_t mctrack = 0, num_bg = 0;
+    #endif
+        for( ; start != next; ++start ) {
+          Int_t istrip = *start;
+          Double_t pos = GetChanPos(istrip); //GetStart() + istrip * GetPitch();
+          Double_t adc = fADCcor[istrip];
+          //cout<<istrip<<" "<<adc<<" "<<sc<<endl;
+          xsum   += pos * adc;
+          adcsum += adc;
+          if (adc > maxSave){
+              maxSave = adc;
+              maxID   = istrip;
+          }
+    #ifdef MCDATA
+          // If doing MC data, analyze the strip truth information
+          if( mc_data ) {
+	    MCHitInfo& mc = fMCHitInfo[istrip];
+	    // This may be smaller than the actual total number of background hits
+	    // contributing to the entire cluster, but counting them would involve
+	    // lists of secondary particle numbers ... overkill for now
+	    num_bg = TMath::Max( num_bg, mc.fContam );
+	    // All primary particle hits in the cluster are from the same track
+	    //assert( mctrack == 0 || mc.fMCTrack == 0 || mctrack == mc.fMCTrack );
+
+        //fMCTrack > 0 means signal hit, the value is actually the track ID
+        //fMCTrack == 0 means background hit
+        //fMCTrack == -1 means it is induced hit on the readout strip
+
+	    if( mctrack == 0 ) {
+	      if( mc.fMCTrack > 0 ) {
+	        // If the cluster contains a signal hit, save its info and be done
+	        mctrack = mc.fMCTrack;
+	        mcpos   = mc.fMCPos;
+	        mctime  = mc.fMCTime;
+	      }
+	      else if (mc.fMCTrack == 0){
+	        // If background hits only, compute position average
+	        mcpos  += mc.fMCPos;
+	        mctime  = TMath::Min( mctime, mc.fMCTime );
+	      }else{
+            assert(mc.fMCTrack == -1); //induced strip, cannot be anything else
+            mcpos  += pos; //no other avaiable information for induced strip
+            //no timing information right now for induced strip as well
+          }
+	    }
+          }
+    #endif // MCDATA
+        }
+        assert( adcsum > 0.0 );
+        Double_t pos = xsum/adcsum;
+        //cout<<pos<<" "<<sc<<endl;
+    #ifdef MCDATA
+        if( mc_data && mctrack == 0 ) {
+          mcpos /= static_cast<Double_t>(size);
+        }
+    #endif
+        // The resolution (sigma) of the position measurement depends on the
+        // cluster size. In particular, if the cluster consists of only a single
+        // hit, the resolution is much reduced
+        Double_t resolution = fResolution;
+        if (type == 3) resolution *= 2.;
+        if( size == 1 ) {
+          resolution = TMath::Max( 0.25*GetPitch(), fResolution );
+          // The factor of 1/2*pitch is just a guess. Since with real GEMs
+          // there _should_ always be more than one strip per cluster, we must
+          // assume that the other strip(s) did not fire due to inefficiency.
+          // As a result, the error is bigger than it would be if only ever one
+          // strip fired per hit.
+    //       resolution = TMath::Max( 0.5*GetPitch(), 2.0*fResolution );
+    //     } else if( size == 2 ) {
+    //       // Again, this is a guess, to be quantified with Monte Carlo
+    //       resolution = 1.2*fResolution;
+        }
+
+    Bool_t splitType = sc == 0 ? true : false;
+        // Make a new hit
+    #ifndef NDEBUG
+        SoLIDRawHit* theHit = 0;
+    #endif
+    #ifdef MCDATA
+        if( !mc_data ) {
+    #endif
+    #ifndef NDEBUG
+          theHit =
+    #endif
+	    new( (*fHits)[nHits++] ) SoLIDRawHit( pos,
+					     adcsum,
+					     size,
+					     type,
+					     resolution,
+					     splitType,
+                                             maxID,
+					     this
+					     );
+    #ifdef MCDATA
+        } else {
+          // Monte Carlo data
+    #ifndef NDEBUG
+          theHit =
+    #endif
+	    new( (*fHits)[nHits++] ) SoLIDMCRawHit( pos,
+					       adcsum,
+					       size,
+					       type,
+					       resolution,
+					       splitType,
+					       maxID,
+					       this,
+					       mctrack,
+					       mcpos,
+					       mctime,
+					       num_bg
+					       );
+					       //cout<<mctrack<<" "<<mcpos<<" "<<pos<<" "<<sc<<endl;
+        }
+    #endif // MCDATA
+    #ifndef NDEBUG
+        // Ensure hits are ordered by position (should be guaranteed by std::map)
+        assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
+        prevHit = theHit;
+    #endif
+      }
+  }
   if (fKillCrossTalk) KillCrossTalk();
 
   return 1;
@@ -619,7 +653,9 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
   Int_t status = -1;
-  fNStrip = -1;
+  fNStrip = 0;
+  fNDivStrip = 0;
+  fDivStart = -1;
   fStripAngle  = 361.;
   fResolution = -1.;
   fMaxClusterSize = -1;
@@ -664,6 +700,8 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
           { "dphi",                &fDPhi,            kDouble,  0, 0 },
           { "start",               &fStartPos,        kDouble,  0, 0 },
           { "nstrips",             &fNStrip,          kInt,     0, 0 },
+          { "n_divstrips",         &fNDivStrip,       kInt,     0, 0 },
+          { "div_start",           &fDivStart,        kInt,     0, 0 },
           { "deconmode",           &fDeconMode,       kInt,     0, 0 },
           { "mapping",             &mapping,          kTString, 0, 1 }, // not using it right now
           { "chanmap",             &fChanMap,         kIntV,    0, 1 }, // not using it right now
@@ -693,6 +731,8 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
   fclose(file);
   if( status != kOK ) return status;
   
+  fNChan = fNStrip +fNDivStrip;
+  
   //change it from deg to rad here once and for all
   fStripAngle *= TMath::DegToRad();
   fSinStripAngle = TMath::Sin(fStripAngle);
@@ -715,15 +755,15 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
     }
   }
   
-  if( fNStrip <= 0 or fNStrip > kMaxNChan ) {
+  if( fNChan <= 0 or fNChan > kMaxNChan ) {
     Error( Here(here), "Invalid number of channels: %d. Must be > 0 and < %d. "
            "Fix database or recompile code with a larger limit.",
-           fNStrip, kMaxNChan );
+           fNChan, kMaxNChan );
     return kInitError;
   }
 
   Int_t nchan = fDetMap->GetTotNumChan();
-  if( nchan != fNStrip ) {
+  if( nchan != fNChan ) {
     Error( Here(here), "Number of detector map channels (%d) "
            "disagrees with number of strips (%d)", nchan, fNStrip );
     return kInitError;
@@ -743,19 +783,20 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
   // that the global variable system still doesn't support arrays/vectors
   // of structures/objects.
   // Out of memory exceptions from here are caught in Tracker.cxx.
-  fADCraw = new Float_t[fNStrip];
-  fADC = new Float_t[fNStrip];
-  fHitTime = new Float_t[fNStrip];
-  fADCcor = new Float_t[fNStrip];
-  fGoodHit = new Byte_t[fNStrip];
-  fSigStrips.reserve(fNStrip);
-  fStripsSeen.resize(fNStrip);
+  fADCraw = new Float_t[fNChan];
+  fADC = new Float_t[fNChan];
+  fHitTime = new Float_t[fNChan];
+  fADCcor = new Float_t[fNChan];
+  fGoodHit = new Byte_t[fNChan];
+  fSigStrips[0].reserve(fNStrip);
+  fSigStrips[1].reserve(fNDivStrip);
+  fStripsSeen.resize(fNChan);
 
 #ifdef MCDATA
   assert( dynamic_cast<SoLIDTrackerSystem*>(GetMainDetector()) );
   if(dynamic_cast<SoLIDTrackerSystem*>( GetMainDetector() )->TestBit(SoLIDTrackerSystem::kMCData)){
-    fMCHitInfo = new Podd::MCHitInfo[fNStrip];
-    fMCHitList.reserve(fNStrip);
+    fMCHitInfo = new Podd::MCHitInfo[fNChan];
+    fMCHitList.reserve(fNChan);
   }
 #endif
 
@@ -770,15 +811,15 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
       fMapType = kReverse;
     else if( mapping.Length() >= 5 and
              mapping.BeginsWith(TString("gassiplex-adapter"),cmp) ) {
-      if( fNStrip > 240 ) {
+      if( fNChan > 240 ) {
         Error( Here(here), "Gassiplex adapter mapping allows at most 240 "
-               "strips, but %d configured. Fix database.", fNStrip );
+               "strips, but %d configured. Fix database.", fNChan );
         return kInitError;
       }
-      if( fNStrip < 240 ) {
+      if( fNChan < 240 ) {
         Warning( Here(here), "Gassiplex adapter mapping expects 240 "
                  "strips, but %d configured. Database may be misconfigured "
-                 "(or you know what you are doing).", fNStrip );
+                 "(or you know what you are doing).", fNChan );
       }
       if( mapping.BeginsWith(TString("gassiplex-adapter-2"),cmp) ) {
         fMapType = kGassiplexAdapter2;
@@ -792,18 +833,18 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
                "defined. Specify chanmap in database." );
         return kInitError;
       }
-      if( fChanMap.size() != static_cast<UInt_t>(fNStrip) ) {
+      if( fChanMap.size() != static_cast<UInt_t>(fNChan) ) {
         Error( Here(here), "Number of channel map entries (%u) must equal "
                "number of strips (%d). Fix database.",
-               static_cast<unsigned int>(fChanMap.size()), fNStrip );
+               static_cast<unsigned int>(fChanMap.size()), fNChan );
         return kInitError;
       }
       // check if entries in channel map are within range
       for( Vint_t::const_iterator it = fChanMap.begin();
            it != fChanMap.end(); ++it ) {
-        if( (*it) < 0 or (*it) >= fNStrip ) {
+        if( (*it) < 0 or (*it) >= fNChan ) {
           Error( Here(here), "Illegal chanmap entry: %d. Must be >= 0 and "
-                 "< %d. Fix database.", (*it), fNStrip );
+                 "< %d. Fix database.", (*it), fNChan );
           return kInitError;
         }
       }
@@ -817,11 +858,11 @@ Int_t SoLIDGEMReadOut::ReadDatabase( const TDatime& date )
   } else
     fChanMap.clear();
 
-  if( !fPed.empty() and fPed.size() != static_cast<UInt_t>(fNStrip) ) {
+  if( !fPed.empty() and fPed.size() != static_cast<UInt_t>(fNChan) ) {
   cout<<"not using pedestal yet, should not get here"<<endl;
     Error( Here(here), "Size of pedestal array (%u) must equal "
            "number of strips (%d). Fix database.",
-           static_cast<unsigned int>(fPed.size()), fNStrip );
+           static_cast<unsigned int>(fPed.size()), fNChan );
     return kInitError;
   }
 
@@ -1062,7 +1103,7 @@ Int_t SoLIDGEMReadOut::MapChannel( Int_t idx ) const
   // Map hardware channel number to logical strip number based on mapping
   // prescription from database
 
-  assert( idx >= 0 and idx < fNStrip );
+  assert( idx >= 0 and idx < fNChan );
 
   Int_t ret = 0;
   switch( fMapType ) {
@@ -1070,7 +1111,7 @@ Int_t SoLIDGEMReadOut::MapChannel( Int_t idx ) const
     ret = idx;
     break;
   case kReverse:
-    ret = fNStrip-idx-1;
+    ret = fNChan-idx-1;
     break;
   case kGassiplexAdapter1:
     assert( idx < 240 );
@@ -1096,11 +1137,11 @@ Int_t SoLIDGEMReadOut::MapChannel( Int_t idx ) const
     break;
   case kTable:
     // Use the mapping lookup table
-    assert( fChanMap.size() == static_cast<Vint_t::size_type>(fNStrip) );
+    assert( fChanMap.size() == static_cast<Vint_t::size_type>(fNChan) );
     ret = fChanMap[idx];
     break;
   }
-  assert( ret >= 0 and ret < fNStrip );
+  assert( ret >= 0 and ret < fNChan );
   return ret;
 }
 //_____________________________________________________________________________
@@ -1113,7 +1154,8 @@ void SoLIDGEMReadOut::AddStrip( Int_t istrip )
   if( adc >= fADCMin ) ++fNHitStrips;
     
   if( fGoodHit[istrip] and adc >= fADCMin ) {
-    fSigStrips.push_back(istrip);
+    if (istrip < fNStrip) fSigStrips[0].push_back(istrip);
+    else fSigStrips[1].push_back(istrip);
   }
 #ifdef TESTCODE
   if( fDoHisto ) {
@@ -1145,15 +1187,29 @@ void SoLIDGEMReadOut::UpdateOffset()
 
   fCoorOffset = trackerCenter.X()*TMath::Cos(fStripAngle) +
                 trackerCenter.Y()*TMath::Sin(fStripAngle);
-
+  cout<<"offset "<<fCoorOffset<<endl;
 }
 //_______________________________________________________________________________
-
-
-
-
-
-
+Double_t SoLIDGEMReadOut::GetChanPos(Int_t ichan)
+{
+    if (ichan < fNStrip)
+    return GetStart() + ichan * GetPitch();
+    else return GetStart() + (ichan - fNStrip + fDivStart)*GetPitch();
+}
+//________________________________________________________________________________
+Int_t SoLIDGEMReadOut::GetBaseStripID(Int_t ichan)
+{
+    if (ichan < fNStrip) return ichan;
+    else return ichan - fNStrip + fDivStart;
+}
+//________________________________________________________________________________
+bool SoLIDGEMReadOut::IsStripDivided(Int_t ichan)
+{
+    if (fNDivStrip == 0) return false;
+    int baseID = GetBaseStripID(ichan);
+    if (baseID >= fDivStart && baseID < fDivStart + fNDivStrip) return true;
+    else return false;
+}
 
 
 

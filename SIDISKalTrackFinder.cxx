@@ -13,9 +13,9 @@
 #define MAXNTRACKS_LAEC 1000
 
 ClassImp(SIDISKalTrackFinder)
-SIDISKalTrackFinder::SIDISKalTrackFinder(bool isMC, const char* name)
-:SoLKalTrackFinder(), THaAnalysisObject(name, "SIDIS_Track_Finder"), fIsMC(isMC),
- fNGoodTrack(0)
+SIDISKalTrackFinder::SIDISKalTrackFinder(bool isMC, const char* name, int detConf )
+:SoLKalTrackFinder(), THaAnalysisObject(name, "SIDIS_Track_Finder"), 
+fDetConf(detConf), fIsMC(isMC),fNGoodTrack(0)
 {
   Init();
   fGEMTracker.clear();
@@ -552,6 +552,7 @@ void SIDISKalTrackFinder::TrackFollow()
 //___________________________________________________________________________________________________________________
 void SIDISKalTrackFinder::FindandAddVertex()
 {
+   fFieldStepper->UseFineStep();
    for (Int_t i=0; i<fCoarseTracks->GetLast()+1; i++){
       SoLKalTrackSystem* thisSystem = (SoLKalTrackSystem*)(fCoarseTracks->At(i));
       thisSystem->SetCurInstancePtr(thisSystem);
@@ -560,10 +561,29 @@ void SIDISKalTrackFinder::FindandAddVertex()
       if (thisSystem->GetTrackStatus() == kFALSE) continue; //skip bad tracks
       
       SoLKalTrackState currentState = (thisSystem->GetCurSite()).GetCurState();
-      currentState.InitPredictSV();
+      //currentState.InitPredictSV();
       
-      SoLKalTrackState *predictState = currentState.PredictSVatNextZ(fTargetCenter);
-      Double_t vertexz = FindVertexZ(predictState);
+      //SoLKalTrackState *predictState = currentState.PredictSVatNextZ(fTargetCenter);
+      //Double_t vertexz = FindVertexZ(predictState);
+      
+      //now we do the iterations here
+      TVector3 initPosition(currentState(kIdxX0, 0), currentState(kIdxY0, 0), currentState.GetZ0());
+      TVector3 initMomentum(0, 0, 0);
+      TVector3 finalPosition(0, 0, 0);
+      TVector3 finalMomentum(0, 0, 0);
+      currentState.CalcMomVec(initMomentum);
+      double vertexz = fTargetCenter;
+      double step = 0.02;
+      double charge = thisSystem->GetCharge();
+      
+      for (int iter = 0; iter < 3; iter++){
+        fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, vertexz, 
+                                               charge, step, finalMomentum, finalPosition);
+        double tx = finalMomentum.X()/finalMomentum.Z();
+        double ty = finalMomentum.Y()/finalMomentum.Z();
+        vertexz   = vertexz + (1./(pow(tx,2) + pow(ty,2)))*
+                           (tx*(fBPMX-finalPosition.X()) + ty*(fBPMY-finalPosition.Y()) );
+      }
       
       if (thisSystem->GetAngleFlag() == kFAEC && fabs(vertexz - fTargetCenter) > (fTargetLength/2. + fCellEdgeCut[kFAEC]) ){
         thisSystem->SetTrackStatus(kFALSE);
@@ -577,12 +597,14 @@ void SIDISKalTrackFinder::FindandAddVertex()
       //propagate the state vector to the interaction vertex that just found
       //not sure if this is the best way to add vertex
       currentState.InitPredictSV();
-      predictState = currentState.PredictSVatNextZ(vertexz);
+      SoLKalTrackState *predictState = currentState.PredictSVatNextZ(vertexz);
       
       //make a site at the interaction vertex to add to the fitting
       SoLKalTrackSite &vertexSite = *new SoLKalTrackSite(kMdim, kSdim,  kGiga);
       vertexSite.SetMeasurement(fBPMX, fBPMY);
-      vertexSite.SetHitResolution(3e-4, 3e-4);
+      if (fDetConf == 3) vertexSite.SetHitResolution(1e-3, 1e-3);
+      else vertexSite.SetHitResolution(3e-4, 3e-4);
+      
       vertexSite.Add(predictState);
       if (vertexSite.Filter()){
         //calculate vertex variables and set info to the track system
@@ -612,6 +634,7 @@ void SIDISKalTrackFinder::FindandAddVertex()
       currentState.ClearAttemptSV();
       delete &vertexSite;
    }
+   fFieldStepper->UseDefaultStep();
 }
 //___________________________________________________________________________________________________________________
 void SIDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
@@ -857,7 +880,8 @@ inline int SIDISKalTrackFinder::GetHitsInWindow(int plane, double x, double wx, 
 //____________________________________________________________________________________________________________________
 inline Double_t SIDISKalTrackFinder::FindVertexZ(SoLKalTrackState* thisState)
 {
-  assert(fabs(thisState->GetZ0() - fTargetCenter) < 0.01);
+  //cout<<thisState->GetZ0()<<" "<<fTargetCenter<<" "<<(*thisState)(kIdxX0, 0)<<" "<<(*thisState)(kIdxY0,0)<<endl;
+  //assert(fabs(thisState->GetZ0() - fTargetCenter) < 0.01);
   Double_t vertexz = fTargetCenter+ (1./(pow((*thisState)(kIdxTX, 0),2) + pow((*thisState)(kIdxTY, 0),2)))*
   ((*thisState)(kIdxTX,0)*(fBPMX-(*thisState)(kIdxX0,0)) + (*thisState)(kIdxTY,0)*(fBPMY-(*thisState)(kIdxY0, 0)));
   
@@ -979,56 +1003,96 @@ inline double SIDISKalTrackFinder::PredictR(Int_t &plane, SoLIDGEMHit* hit1, SoL
 inline Bool_t SIDISKalTrackFinder::CalInitParForPair(SoLIDGEMHit* hita, SoLIDGEMHit* hitb, Double_t &charge,
                                                  Double_t& mom, Double_t& theta, Double_t& phi, ECType& type)
 {
-  double deltaR = hitb->GetR() - hita->GetR();
-  double deltaPhi = TVector2::Phi_mpi_pi(hitb->GetPhi() - hita->GetPhi());
-  deltaPhi = fabs(deltaPhi);
+    double deltaR = hitb->GetR() - hita->GetR();
+    double deltaPhi = TVector2::Phi_mpi_pi(hitb->GetPhi() - hita->GetPhi());
+    deltaPhi = fabs(deltaPhi);
+
+    double deltaZ = hitb->GetZ() - hita->GetZ();
+    double deltaY = hitb->GetY() - hita->GetY();
+    double deltaX = hitb->GetX() - hita->GetX();
+
+    theta = atan(deltaR/deltaZ);
+    phi = atan2(deltaY, deltaX);
   
-  double deltaZ = hitb->GetZ() - hita->GetZ();
-  double deltaY = hitb->GetY() - hita->GetY();
-  double deltaX = hitb->GetX() - hita->GetX();
+    if (fDetConf == 3){ //SIDIS NH3
+        if (type == kFAEC && hita->GetTrackerID() == 4 && hitb->GetTrackerID() == 5){
+            if (deltaPhi < -3.54398e-04 + 1e-6) return kFALSE;
+            mom = 1.82273e-01/(deltaPhi - -3.54398e-04);
+            theta += -3.15393e-05 + -0.00194545*deltaPhi + 1.92086*deltaPhi*deltaPhi;
+            phi += 0.000503764 + 0.843494*deltaPhi + 0.613864*deltaPhi*deltaPhi;
+        }
+        else if (type == kFAEC && hita->GetTrackerID() == 3 && hitb->GetTrackerID() == 4){
+            if (deltaPhi < -1.44365e-04 + 1e-6) return kFALSE;
+            mom = 1.52902e-01/(deltaPhi - -1.44365e-04);
+            theta += -6.27864e-05 + 0.00150745*deltaPhi + 1.87546*deltaPhi*deltaPhi;
+            phi +=  0.00283427+ 0.925668*deltaPhi + 1.29002*deltaPhi*deltaPhi;
+        }
+        else if (type == kFAEC && hita->GetTrackerID() == 3 && hitb->GetTrackerID() == 5){
+            if (deltaPhi < -2.67014e-04 + 1e-6) return kFALSE;
+            mom = 3.40491e-01/(deltaPhi - -2.67014e-04);
+            theta +=  -0.000104712+ 0.00152549*deltaPhi + 0.451974*deltaPhi*deltaPhi;
+            phi += 0.00410935 + 0.832924*deltaPhi + 0.607294*deltaPhi*deltaPhi;
+        }
+        else if (type == kLAEC && hita->GetTrackerID() == 2 && hitb->GetTrackerID() == 3){
+            if (deltaPhi < -1.18851e-03 + 1e-6) return kFALSE;
+            mom = 1.12414e-01/(deltaPhi - -1.18851e-03);
+            theta +=  0.000239174+ -0.0296545*deltaPhi + 5.32953*deltaPhi*deltaPhi;
+            phi += 0.00472525+ 0.88319*deltaPhi + 5.14816*deltaPhi*deltaPhi;
+        }
+        else if (type == kLAEC && hita->GetTrackerID() == 1 && hitb->GetTrackerID() == 2){
+            if (deltaPhi < -9.32190e-04 + 1e-6) return kFALSE;
+            mom = 6.42127e-02/(deltaPhi - -9.32190e-04);
+            theta += 4.88206e-05 + -0.0184821*deltaPhi + 9.93942*deltaPhi*deltaPhi;
+            phi += 0.00560415+ 0.608656*deltaPhi + 20.6661*deltaPhi*deltaPhi;
+        }
+        else if (type == kLAEC && hita->GetTrackerID() == 1 && hitb->GetTrackerID() == 3){
+            if (deltaPhi < -2.10386e-03 + 1e-6) return kFALSE;
+            mom = 1.76726e-01/(deltaPhi - -2.10386e-03);
+            theta += 2.66966e-05 + -0.00712552*deltaPhi + 1.88514*deltaPhi*deltaPhi;
+            phi +=0.0103316 + 0.798952*deltaPhi + 4.67825*deltaPhi*deltaPhi;
+        }
+    }
+    else{ //SIDIS He3 and JPsi
+        if (type == kFAEC && hita->GetTrackerID() == 4 && hitb->GetTrackerID() == 5){
+            if (deltaPhi < -0.000260251 + 1e-6) return kFALSE;
+            mom = 0.184566/(deltaPhi - -0.000260251);
+            theta += 0.00117211 + -0.0519514*deltaPhi + 2.25303*deltaPhi*deltaPhi;
+            phi +=(-1.*charge)*( 0.000617591 + 0.827572*deltaPhi + 0.53233*deltaPhi*deltaPhi );
+        }
+        else if (type == kFAEC && hita->GetTrackerID() == 3 && hitb->GetTrackerID() == 4){
+            if (deltaPhi < -0.000456619 + 1e-6) return kFALSE;
+            mom = 0.156196/(deltaPhi - -0.000456619);
+            theta += 0.000614522 + -0.0317596*deltaPhi + 2.14209*deltaPhi*deltaPhi;
+            phi += (-1*charge)*(-0.000117883 + 1.0794*deltaPhi + -0.178718*deltaPhi*deltaPhi);
+        }
+        else if (type == kFAEC && hita->GetTrackerID() == 3 && hitb->GetTrackerID() == 5){
+            if (deltaPhi < -0.00068094 + 1e-6) return kFALSE;
+            mom = 0.340493/(deltaPhi - -0.00068094);
+            theta += 0.000992593 + -0.0239743*deltaPhi + 0.549664*deltaPhi*deltaPhi;
+            phi += (-1*charge)*(0.000672179 + 0.908331*deltaPhi + 0.166936*deltaPhi*deltaPhi);
+        }
+        else if (type == kLAEC && hita->GetTrackerID() == 2 && hitb->GetTrackerID() == 3){
+            if (deltaPhi < -0.000396581 + 1e-6) return kFALSE;
+            mom = 0.109309/(deltaPhi - -0.000396581);
+            theta += 3.61953e-05 + -1.06941e-05*deltaPhi + 4.23056*deltaPhi*deltaPhi;
+            phi += (-1*charge)*(-0.000283361 + 1.2515*deltaPhi + -0.637376*deltaPhi*deltaPhi);
+        }
+        else if (type == kLAEC && hita->GetTrackerID() == 1 && hitb->GetTrackerID() == 2){
+            if (deltaPhi < -0.000371282 + 1e-6) return kFALSE;
+            mom = 0.0610608/(deltaPhi - -0.000371282);
+            theta += 5.30086e-05 + -0.00477822*deltaPhi + 8.29537*deltaPhi*deltaPhi;
+            phi += (-1*charge)*(-0.00018356 + 1.39156*deltaPhi + -1.29865*deltaPhi*deltaPhi);
+        }
+        else if (type == kLAEC && hita->GetTrackerID() == 1 && hitb->GetTrackerID() == 3){
+            if (deltaPhi < -0.000743132 + 1e-6) return kFALSE;
+            mom = 0.17019/(deltaPhi - -0.000743132);
+            theta += -5.87987e-06 + 0.00195822*deltaPhi + 1.58111*deltaPhi*deltaPhi;
+            phi += (-1*charge)*(-0.000508897 + 1.30589*deltaPhi + -0.468172*deltaPhi*deltaPhi);
+        }
+    }
   
-  theta = atan(deltaR/deltaZ);
-  phi = atan2(deltaY, deltaX);
-  
-  if (type == kFAEC && hita->GetTrackerID() == 4 && hitb->GetTrackerID() == 5){
-    if (deltaPhi < -0.000260251 + 1e-6) return kFALSE;
-    mom = 0.184566/(deltaPhi - -0.000260251);
-    theta += 0.00117211 + -0.0519514*deltaPhi + 2.25303*deltaPhi*deltaPhi;
-    phi +=(-1.*charge)*( 0.000617591 + 0.827572*deltaPhi + 0.53233*deltaPhi*deltaPhi );
-  }
-  else if (type == kFAEC && hita->GetTrackerID() == 3 && hitb->GetTrackerID() == 4){
-    if (deltaPhi < -0.000456619 + 1e-6) return kFALSE;
-    mom = 0.156196/(deltaPhi - -0.000456619);
-    theta += 0.000614522 + -0.0317596*deltaPhi + 2.14209*deltaPhi*deltaPhi;
-    phi += (-1*charge)*(-0.000117883 + 1.0794*deltaPhi + -0.178718*deltaPhi*deltaPhi);
-  }
-  else if (type == kFAEC && hita->GetTrackerID() == 3 && hitb->GetTrackerID() == 5){
-    if (deltaPhi < -0.00068094 + 1e-6) return kFALSE;
-    mom = 0.340493/(deltaPhi - -0.00068094);
-    theta += 0.000992593 + -0.0239743*deltaPhi + 0.549664*deltaPhi*deltaPhi;
-    phi += (-1*charge)*(0.000672179 + 0.908331*deltaPhi + 0.166936*deltaPhi*deltaPhi);
-  }
-  else if (type == kLAEC && hita->GetTrackerID() == 2 && hitb->GetTrackerID() == 3){
-    if (deltaPhi < -0.000396581 + 1e-6) return kFALSE;
-    mom = 0.109309/(deltaPhi - -0.000396581);
-    theta += 3.61953e-05 + -1.06941e-05*deltaPhi + 4.23056*deltaPhi*deltaPhi;
-    phi += (-1*charge)*(-0.000283361 + 1.2515*deltaPhi + -0.637376*deltaPhi*deltaPhi);
-  }
-  else if (type == kLAEC && hita->GetTrackerID() == 1 && hitb->GetTrackerID() == 2){
-    if (deltaPhi < -0.000371282 + 1e-6) return kFALSE;
-    mom = 0.0610608/(deltaPhi - -0.000371282);
-    theta += 5.30086e-05 + -0.00477822*deltaPhi + 8.29537*deltaPhi*deltaPhi;
-    phi += (-1*charge)*(-0.00018356 + 1.39156*deltaPhi + -1.29865*deltaPhi*deltaPhi);
-  }
-  else if (type == kLAEC && hita->GetTrackerID() == 1 && hitb->GetTrackerID() == 3){
-    if (deltaPhi < -0.000743132 + 1e-6) return kFALSE;
-    mom = 0.17019/(deltaPhi - -0.000743132);
-    theta += -5.87987e-06 + 0.00195822*deltaPhi + 1.58111*deltaPhi*deltaPhi;
-    phi += (-1*charge)*(-0.000508897 + 1.30589*deltaPhi + -0.468172*deltaPhi*deltaPhi);
-  }
-  
-  phi = TVector2::Phi_mpi_pi(phi);
-  return kTRUE;
+    phi = TVector2::Phi_mpi_pi(phi);
+    return kTRUE;
   
 }
 //________________________________________________________________________________________________________________________

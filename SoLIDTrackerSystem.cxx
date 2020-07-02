@@ -266,11 +266,14 @@ THaAnalysisObject::EStatus SoLIDTrackerSystem::Init( const TDatime& date )
   }
 
   if (fDetConf == 0){
-    fTrackFinder = new SIDISKalTrackFinder(TestBit(kMCData));
+    fTrackFinder = new SIDISKalTrackFinder(TestBit(kMCData), "SIDISTrackFinder", fDetConf);
   }else if (fDetConf == 1){
     fTrackFinder = new PVDISKalTrackFinder(TestBit(kMCData));
   }else if (fDetConf == 2){
-    fTrackFinder = new SIDISKalTrackFinder(TestBit(kMCData), "JPsiTrackFinder");
+    fTrackFinder = new SIDISKalTrackFinder(TestBit(kMCData), "JPsiTrackFinder", fDetConf);
+  }else if (fDetConf == 3){
+    fTrackFinder = new SIDISKalTrackFinder(TestBit(kMCData), "SIDISNH3TrackFinder", fDetConf);
+    fFieldMap->LoadTargetFieldMap();
   }
 
   fTrackFinder->SetGEMDetector(fGEMTracker);
@@ -324,8 +327,13 @@ Int_t SoLIDTrackerSystem::CoarseTrack( TClonesArray& /*tracks*/ )
     assert( dynamic_cast<MCTrack*>(fMCDecoder->GetMCTrack(0)) );
     MCTrack* trk = static_cast<MCTrack*>( fMCDecoder->GetMCTrack(0) );
     assert(trk);
-    fBPMX = trk->VX() + gRandom->Gaus(0., 3e-4);
-    fBPMY = trk->VY() + gRandom->Gaus(0., 3e-4);
+    if (fDetConf == 3){
+        fBPMX = trk->VX() + gRandom->Gaus(0., 1e-3);
+        fBPMY = trk->VY() + gRandom->Gaus(0., 1e-3);
+    }else{
+        fBPMX = trk->VX() + gRandom->Gaus(0., 3e-4);
+        fBPMY = trk->VY() + gRandom->Gaus(0., 3e-4);
+    }
     fTrackFinder->SetBPM(fBPMX, fBPMY);
   }
 #endif

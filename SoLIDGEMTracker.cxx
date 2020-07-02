@@ -63,6 +63,7 @@ void SoLIDGEMTracker::Clear( Option_t* opt)
 //_________________________________________________________________________________________
 Int_t SoLIDGEMTracker::Decode( const THaEvData& evdata)
 {
+  //cout<<"GEM tracker "<<fTrackerID<<endl;
   for (Int_t i=0; i<fNChamber; i++){
     fGEMChamber[i]->Decode(evdata);
   }

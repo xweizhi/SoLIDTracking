@@ -36,7 +36,7 @@ SoLIDGEMChamber::SoLIDGEMChamber(Int_t ichamber, const char* name, const char* d
     return;
   }
   
-
+  fHasDivSeg = 0;
 
 }
 //_________________________________________________________________________________________
@@ -201,6 +201,7 @@ Int_t SoLIDGEMChamber::ReadDatabase( const TDatime& date )
   if (status != kOK) { return status; }
 
   fIsInit = kTRUE;
+  
   return fStatus = kOK;
 }
 //__________________________________________________________________________________________
@@ -214,9 +215,13 @@ Int_t SoLIDGEMChamber::ReadGeometry( FILE* file, const TDatime& date,
   fRMin = -1.;
   fRMax = -1.;
   vector<Double_t>* reference = 0;
+  vector<Double_t>* divSegX = 0;
+  vector<Double_t>* divSegY = 0;
   string fileName = "";
   try{
     reference = new vector<Double_t>;
+    divSegX = new vector<Double_t>;
+    divSegY = new vector<Double_t>;
     const DBRequest request[] = {
           { "rmin",           &fRMin,            kDouble,  0, 0 },
           { "rmax",           &fRMax,            kDouble,  0, 0 },
@@ -225,19 +230,33 @@ Int_t SoLIDGEMChamber::ReadGeometry( FILE* file, const TDatime& date,
           { "phi_cover",      &fPhiCover,        kDouble,  0, 0 },
           { "phi_offset",     &fPhiOffset,       kDouble,  0, 0 },
           { "acc_file_name",  &fileName,         kString,  0, 1 },
+          { "has_div_segment",&fHasDivSeg,       kInt,     0, 1 },
           { "reference",       reference,        kDoubleV},
+          { "div_segment_x",   divSegX,          kDoubleV},
+          { "div_segment_y",   divSegY,          kDoubleV},
           { 0 }
       };
     status = LoadDB( file, date, request, fPrefix );
     assert(reference->size() == 2); //a reference is a point in x-y, z is already know from tracker
     //fReference.Set(reference->at(0), reference->at(1));
+    if (fHasDivSeg) assert(divSegX->size() == 4 && divSegY->size() == 4);
+    
+    for (int i=0; i<4; i++){
+        fDivSegX[i] = divSegX->at(i);
+        fDivSegY[i] = divSegY->at(i);
+    }
+    
+    delete divSegX;
+    delete divSegY;
     delete reference; //it has served its purpose, rest in peace
   }catch(...) {
-      delete reference;
-      fclose(file);
-      throw;
+    delete divSegX;
+    delete divSegY;
+    delete reference;
+    fclose(file);
+    throw;
   }
-  
+
    if( fRMin < 0 or fRMax < 0 ) {
     Error( Here(here), "rmin and rmax must be positive. Read %.1lf and %.1lf. "
            "Fix database.", fRMin, fRMax );
@@ -297,6 +316,11 @@ Int_t SoLIDGEMChamber::ReadGeometry( FILE* file, const TDatime& date,
   fOrigin.SetXYZ( 0.5*(xmin+xmax) - r_shift, 0.0,
                   dynamic_cast<SoLIDGEMTracker*>(GetParent())->GetZ() + fDz);
   fChamberCenter = fOrigin;
+  
+  fDivSegX[0] += fChamberCenter.X();
+  fDivSegX[2] += fChamberCenter.X();
+  fDivSegY[0] += fChamberCenter.X();
+  fDivSegY[2] += fChamberCenter.X();
 
   if( fPhiOffset != 0.0 ) {
   //TODO:think if we want to do all the rotations here once and for all, or we break it down
@@ -318,6 +342,9 @@ Int_t SoLIDGEMChamber::ReadGeometry( FILE* file, const TDatime& date,
     }
   //thisFile->Close();
   }
+  
+  
+  
   return kOK;
 
 
@@ -380,16 +407,26 @@ Int_t SoLIDGEMChamber::ProcessRawHits(TSeqCollection* uhits, TSeqCollection* vhi
       if (!avhit->GetStatus()) continue;
       Double_t r = 0;
       Double_t phi = 0;
-      UVtoCylinCoor(auhit->GetPos(), avhit->GetPos(), &r, &phi);
+      Double_t x = 0.;
+      Double_t y = 0.;
+      UVtoCartesian(auhit->GetPos(), avhit->GetPos(), x, y, r, phi);
+      
       if (Contains( &r, &phi ) && CheckChargeAsymmetry( dynamic_cast<SoLIDRawHit*>(auhit)->GetADCsum(),
           dynamic_cast<SoLIDRawHit*>(avhit)->GetADCsum()) ){
+          
+          //if stips are divided, check if it is possible to the 2 1D hits to be combined
+          //need to add more if strips are just partially divided
+          if (fHasDivSeg && !HasIntersect(auhit->GetStripID(), avhit->GetStripID())) continue;
+          
           RotateToLab(&phi);
+          
           if (!mc_data){
             new ( (*fHits)[nHit++]) SoLIDGEMHit( fChamberID, fParentTrackerID, r, phi, GetZ(), auhit, avhit); 
           }
 #ifdef MCDATA
           else{
             new ( (*fHits)[nHit++]) SoLIDMCGEMHit( fChamberID, fParentTrackerID, r, phi, GetZ(), auhit, avhit);
+            //cout<<r<<" "<<phi<<endl;
           }
 #endif
       }
@@ -403,7 +440,7 @@ Int_t SoLIDGEMChamber::ProcessRawHits(TSeqCollection* uhits, TSeqCollection* vhi
   return nHit;
 }
 //____________________________________________________________________________________________
-inline void SoLIDGEMChamber::UVtoCylinCoor(Double_t upos, Double_t vpos, Double_t* r, Double_t* phi)
+inline void SoLIDGEMChamber::UVtoCartesian(Double_t upos, Double_t vpos, Double_t& x, Double_t& y, Double_t& r, Double_t& phi)
 {
 
   assert(fNReadOut == 2);
@@ -413,21 +450,21 @@ inline void SoLIDGEMChamber::UVtoCylinCoor(Double_t upos, Double_t vpos, Double_
   Double_t cv = fGEMReadOut[1]->GetCosStripAngle();
   Double_t ba = sv*cu-su*cv;
 
-  Double_t x = (upos*sv - vpos*su)/ba;
-  Double_t y = (vpos*cu - upos*cv)/ba;
+  x = (upos*sv - vpos*su)/ba;
+  y = (vpos*cu - upos*cv)/ba;
   
   if (fAcceptHist != NULL){
     int inx = fAcceptHist->GetXaxis()->FindBin(x);
     int iny = fAcceptHist->GetYaxis()->FindBin(y);
     if ( fAcceptHist->GetBinContent(inx, iny) < 1.e-6 ){
-        *r = 0.;
-        *phi = 0.;
+        r = 0.;
+        phi = 0.;
         return;
     }
   }
 
-  *r = TMath::Sqrt(x*x + y*y);
-  *phi = TMath::ATan2(y, x); //this is in a frame where center of the symmetric axis of the chamber is
+  r = TMath::Sqrt(x*x + y*y);
+  phi = TMath::ATan2(y, x); //this is in a frame where center of the symmetric axis of the chamber is
                              //the same as x axis
 }
 //____________________________________________________________________________________________
@@ -454,6 +491,16 @@ inline Bool_t SoLIDGEMChamber::Contains(Double_t* r, Double_t *phi)
   else { return kFALSE; }
 }
 //____________________________________________________________________________________________
+inline Bool_t SoLIDGEMChamber::ContainsEdge(Double_t x, Double_t y)
+{
+    double r = TMath::Sqrt(x*x + y*y);
+    double phi = TMath::ATan2(y, x);
+    
+    if ( (r <= fRMax + 1e-6 && r >= fRMin - 1e-6) && ( phi <= fPhiCover/2. + 1e-6
+        && phi >= -fPhiCover/2. - 1e-6) ){ return kTRUE; }
+  else { return kFALSE; }
+}
+//____________________________________________________________________________________________
 inline Bool_t SoLIDGEMChamber::CheckChargeAsymmetry(Double_t qu, Double_t qv)
 {
   if ( TMath::Abs((qu-qv)/(qu+qv)) < f3DAmCorrCut ) return kTRUE;
@@ -471,8 +518,157 @@ inline void SoLIDGEMChamber::RotateToChamber(Double_t* phi)
   *phi -= fPhiInLab;
   *phi = TVector2::Phi_mpi_pi(*phi);
 }
+//____________________________________________________________________________________________
+void SoLIDGEMChamber::GetStripEndPoint(int proj, int type, int chan, double* x, double* y)
+{
+    //type: 2 for undivided, 1 for bottom half 0 for upper half
+    //prot: 0 for u strip and 1 for v strip
+    int countPass = 0;
+    
+    double x0 = 0.;
+    double m  = tan(fGEMReadOut[proj]->GetStripAngle() - TMath::Pi()/2.);
+    double x1 = fGEMReadOut[proj]->GetChanPos(chan)*fGEMReadOut[proj]->GetCosStripAngle();
+    double y1 = fGEMReadOut[proj]->GetChanPos(chan)*fGEMReadOut[proj]->GetSinStripAngle();
+    double b  = y1 - m*x1;
+    
+    //intersection with the large radius bound
+    double val = 4.*(m*m*b*b) - 4.*(1+m*m)*( b*b - fRMax*fRMax);
+    assert(val >= 0);
+    double xout = (-2.*(m*b) + sqrt(val)) / (2.*(1. + m*m));
+    assert(xout > 0);
+    double yout = m*xout + b;
+    //cout<<"r out"<<sqrt(xout*xout + yout*yout)<<endl;
+    if (ContainsEdge(xout, yout)){
+        x[countPass] = xout;
+        y[countPass] = yout;
+        countPass++;
+    }
+    assert(countPass <= 2);
+    
+    //intersection with the small radius bound
+    val = 4.*(m*m*b*b) - 4.*(1+m*m)*(b*b - fRMin*fRMin);
+    assert(val >= 0);
+    double xin = (-2.*(x0+m*b) + sqrt(val)) / (2.*(1. + m*m));
+    assert(xin > 0);
+    double yin = m*xin + b;
+    //cout<<"r min"<<sqrt(xin*xin + yin*yin)<<endl;
+    if (ContainsEdge(xin, yin)){
+        x[countPass] = xin;
+        y[countPass] = yin;
+        countPass++;
+        
+    }
+    assert(countPass <= 2);
+    
+    //intersection with the upper edge
+    double mu = tan(fPhiCover/2.);
+    double xup = 1e9;
+    double yup = 1e9;
+    if (fabs(mu - m) > 1e-6){
+        xup = b/(mu - m);
+        yup = mu*xup;
+    }
+    if (ContainsEdge(xup, yup)){
+        x[countPass] = xup;
+        y[countPass] = yup;
+        countPass++;
+    }
+    assert(countPass <= 2);
+    
+    double mdw = tan(-fPhiCover/2.);
+    double xdw = 1e9;
+    double ydw = 1e9;
+    if (fabs(mdw - m) > 1e-6){
+        xdw = b/(mdw - m);
+        ydw = mdw*xdw;
+    }
+    if (ContainsEdge(xdw, ydw)){
+        x[countPass] = xdw;
+        y[countPass] = ydw;
+        countPass++;
+    }
+    assert(countPass == 2);
+    //cout<<countPass<<endl;
+    
+    if (sqrt(x[0]*x[0] + x[0]*x[0]) 
+      > sqrt(x[1]*x[1] + x[1]*x[1])){
+        swap (x[0], x[1]);
+        swap (y[0], y[1]);
+    }
 
+ 
+    if (type == 2) return;
+    assert(type < 2);
+    
+    double* sp = fDivSegX;
+    if (proj == 1) sp = fDivSegY;
 
+    
+    if (fabs(sp[0] - sp[2]) < 1e-9){
+        //vertical split line
+        double xtmp = sp[0];
+        double ytmp = m*xtmp + b;
+                
+        if (ContainsEdge(xtmp, ytmp)){
+            x[type] = xtmp;
+            y[type] = ytmp;
+        }
+    }else{
+        double ms = (sp[3] - sp[1]) / (sp[2] - sp[0]);
+        double bs = sp[1] - ms*sp[0];
+        
+        double xtmp = (bs - b) / (m - ms);
+        double ytmp = m*xtmp + b;
+        
+        if (ContainsEdge(xtmp, ytmp)){
+            x[type] = xtmp;
+            y[type] = ytmp;
+        }
+    }
+    
+}
+//____________________________________________________________________________________________
+Bool_t SoLIDGEMChamber::HasIntersect(Short_t uChanID, Short_t vChanID)
+{
+    bool isDivided[2] = {fGEMReadOut[0]->IsStripDivided(uChanID), 
+                         fGEMReadOut[1]->IsStripDivided(vChanID)};
+    //if both strips are not divided, the function SoLIDGEMChamber::Contains
+    //should take care of it
+    if (isDivided[0] == false && isDivided[1] == false) return true;
+    
+    int uType = 2, vType = 2;
+    double ux[2], uy[2], vx[2], vy[2];
+    
+    if (isDivided[0]){
+        if (uChanID < fGEMReadOut[0]->GetNStrips()) uType = 0;
+        else uType = 1;
+    }
+    
+    if (isDivided[1]){
+        if (vChanID < fGEMReadOut[1]->GetNStrips()) vType = 0;
+        else vType = 1;
+    }
+    //cout<<uChanID<<" "<<vChanID<<" "<<uType<<" "<<vType<<endl;
+    GetStripEndPoint(0, uType, uChanID, ux, uy);
+    GetStripEndPoint(1, vType, vChanID, vx, vy);
+ 
+   
+    double mu = (uy[1] - uy[0]) / (ux[1] - ux[0]) ;
+    double bu = uy[1] - mu*ux[1];
+    
+    double mv = (vy[1] - vy[0]) / (vx[1] - vx[0]) ;
+    double bv = vy[1] - mv*vx[1];
+    
+    double xinter = (bv - bu) / (mu - mv);
+
+    //cout<<xinter<<" "<<min(ux[0], ux[1])<<" "<<max(ux[0], ux[1])<<" "<<min(vx[0], vx[1])<<" "<<max(vx[0], vx[1])<<endl;
+    
+    if (xinter >= min(ux[0], ux[1]) && xinter <= max(ux[0], ux[1]) && 
+        xinter >= min(vx[0], vx[1]) && xinter <= max(vx[0], vx[1])) return true;
+    else return false;
+    
+    
+}
 
 
 

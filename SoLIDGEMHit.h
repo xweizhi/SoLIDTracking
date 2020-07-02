@@ -24,8 +24,8 @@ class SoLIDGEMReadOut;
 
   public:
     Hit() : fReadOut(0) {}
-    Hit( Double_t pos, Double_t res, SoLIDGEMReadOut* readout )
-      : fPos(pos), fResolution(res), fReadOut(readout) { assert(fReadOut); }
+    Hit( Double_t pos, Double_t res, Bool_t stripType, Short_t id, SoLIDGEMReadOut* readout )
+      : fPos(pos), fResolution(res), fStripType(stripType), fID(id), fReadOut(readout) { assert(fReadOut); }
     // Default copy and assignment are fine
     //    Hit( const Hit& );
     //    Hit& operator=( const Hit& );
@@ -38,12 +38,16 @@ class SoLIDGEMReadOut;
 
     Double_t GetPos()        const { return fPos; }
     Double_t GetResolution() const { return fResolution; }
+    Bool_t   GetStripType()  const { return fStripType; }
+    Short_t  GetStripID()    const { return fID; }
 
     SoLIDGEMReadOut*   GetReadOut()      const { return fReadOut; }
 
   protected:
     Double_t fPos;             // Hit position along plane coordinate axis (m)
     Double_t fResolution;      // Resolution of fPos (sigma, m)
+    Bool_t   fStripType;       //whether it is from divided strip or not
+    Short_t  fID;              // Strip id for the maximum ADC strip
     SoLIDGEMReadOut* fReadOut; //! Pointer to the readout obj where this hit occurred
 
     ClassDef(Hit,1)        // Generic tracker plane hit
@@ -55,8 +59,8 @@ class SoLIDGEMReadOut;
   public:
     SoLIDRawHit() {}
     SoLIDRawHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
-            Double_t res, SoLIDGEMReadOut* readout ) :
-      Hit(pos, res, static_cast<SoLIDGEMReadOut*>(readout)), fADCsum(adc_sum),
+            Double_t res, Bool_t stripType, Short_t id, SoLIDGEMReadOut* readout ) :
+      Hit(pos, res, stripType, id, static_cast<SoLIDGEMReadOut*>(readout)), fADCsum(adc_sum),
       fSize(num_strips), fType(type), fStatus(true) {}
     virtual ~SoLIDRawHit() {}
 
@@ -87,9 +91,9 @@ class SoLIDGEMReadOut;
   public:
     SoLIDMCRawHit() {}
     SoLIDMCRawHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
-              Double_t res, SoLIDGEMReadOut* readout, Int_t mctrk, Double_t mcpos,
+              Double_t res, Bool_t stripType, Short_t id, SoLIDGEMReadOut* readout, Int_t mctrk, Double_t mcpos,
               Double_t mctime, Int_t num_bg_strips )
-      : SoLIDRawHit(pos, adc_sum, num_strips, type, res, readout),
+      : SoLIDRawHit(pos, adc_sum, num_strips, type, res, stripType, id, readout),
         MCHitInfo(mctrk, mcpos, mctime, num_bg_strips) {}
     virtual ~SoLIDMCRawHit() {}
 

@@ -502,7 +502,7 @@ Double_t SoLKalFieldStepper::RKPropagation(SoLKalMatrix &stateVec, SoLKalMatrix 
             
             //get the magnatic field 
 	          B = fFieldMap->GetBField(posAt.X(), posAt.Y(), posAt.Z());
-
+            //cout<<posAt.X()<<" "<<posAt.Y()<<" "<<posAt.Z()<<" "<<B.x()<<" "<<B.y()<<" "<<B.z()<<" "<<-1./qp_in<<endl;
             Double_t tx        = sv_step[kIdxTX];
             Double_t ty        = sv_step[kIdxTY];
             Double_t tx2       = tx * tx;
