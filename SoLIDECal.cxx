@@ -255,6 +255,7 @@ Int_t SoLIDECal::DefineVariables( EMode mode )
 //___________________________________________________________________________________________________
 void SoLIDECal::SmearPosition(Float_t *x, Float_t *y, Int_t mode)
 {
+/*
 #ifdef SIDIS
   //only in SIDIS forward angle, whre ec hit position will be replaced by hit on MRPC
   if (mode == kFAECPos){
@@ -287,7 +288,7 @@ void SoLIDECal::SmearPosition(Float_t *x, Float_t *y, Int_t mode)
     return; //no need to continue
   }
 #endif
-
+*/
   *x += gRandom->Gaus(0, fPosReso);
   *y += gRandom->Gaus(0, fPosReso);
 

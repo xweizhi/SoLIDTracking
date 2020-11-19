@@ -207,8 +207,12 @@ Int_t SoLIDGEMReadOut::Decode( const THaEvData& evdata)
             stripdata = ChipChargeDep(samples);
         }else if (fDeconMode == 2){
             stripdata = SAMPAChargeDep(samples);
-        }else{
-	        stripdata = ChargeDep(samples);
+        }
+        else if (fDeconMode == 3){
+            stripdata = VMMChargeDep(samples);
+        }
+        else{
+	    stripdata = ChargeDep(samples);
         }
       }
       else {
@@ -1095,6 +1099,15 @@ StripData_t SoLIDGEMReadOut::SAMPAChargeDep( const vector<Float_t>& amp )
     
     Float_t time = 0.;
     
+    return StripData_t(adc, adc, time, pass);
+}
+//______________________________________________________________________________________
+StripData_t SoLIDGEMReadOut::VMMChargeDep( const vector<Float_t>& amp )
+{
+    assert( amp.size() >= 1 );
+    Float_t adc = amp[0];
+    Bool_t pass = true; 
+    Float_t time = 0.;
     return StripData_t(adc, adc, time, pass);
 }
 //______________________________________________________________________________________
