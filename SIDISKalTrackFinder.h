@@ -64,7 +64,7 @@ class SIDISKalTrackFinder : public SoLKalTrackFinder, public THaAnalysisObject
   double CalDeltaPhi(const double & phi1, const double & phi2); 
   double CalDeltaR(const double & r1, const double & r2);
   SoLKalTrackSite & SiteInitWithSeed(DoubletSeed* thisSeed);
-  Double_t TriggerCheck(SoLIDGEMHit* theHit, ECType type);
+  bool  TriggerCheck(SoLIDGEMHit* theHit, ECType type, Double_t& matchEnergy);
   SoLIDGEMHit* FindCloestHitInWindow(double &x, double &y);
   double PredictR(Int_t &plane, SoLIDGEMHit* hit1, SoLIDGEMHit* hit2);
   int GetHitsInWindow(int plane, double x, double wx, double y, double wy, bool flag = false);
@@ -84,21 +84,30 @@ class SIDISKalTrackFinder : public SoLKalTrackFinder, public THaAnalysisObject
   Int_t fNGoodTrack;
   Int_t fDetConf;
   
-  Double_t fMomMinCut[2];
-  Double_t fMomMaxCut[2];
-  Double_t fThetaMinCut[2];
-  Double_t fThetaMaxCut[2];
+  Double_t fMomMinCut[3];
+  Double_t fMomMaxCut[3];
+  Double_t fThetaMinCut[3];
+  Double_t fThetaMaxCut[3];
   Double_t fCellEdgeCut[2];
-  Double_t fCoarseCellEdgeCut[2];
-  Double_t fRlimitMin[3][2];
-  Double_t fRlimitMax[3][2];
-  Double_t fDeltaRMin[5][2];
-  Double_t fDeltaRMax[5][2];
-  Double_t fDeltaPhiMin[5][2];
-  Double_t fDeltaPhiMax[5][2];
+  Double_t fCoarseCellEdgeCut[3];
+  Double_t fRlimitMin[3][3];
+  Double_t fRlimitMax[3][3];
+  Double_t fDeltaRMin[3][3];
+  Double_t fDeltaRMax[3][3];
+  Double_t fDeltaRMinBC[2][6];
+  Double_t fDeltaRMaxBC[2][6];
+  Double_t fDeltaPhiMin[3][3];
+  Double_t fDeltaPhiMax[3][3];
+  Double_t fDeltaPhiMinBC[2][6];
+  Double_t fDeltaPhiMaxBC[2][6];
   Double_t fCoarseECPosCut[2];
+  Double_t fCoarseSPDRCut[4];
+  Double_t fCoarseSPDPhiCut[4];
   Double_t fECPosCut;
-  Int_t    fECEnergyMatch[2];
+  Int_t    fECEnergyMatch[3];
+  
+  bool     fHadronFlag;
+  Double_t fElectronVertexZ;
   
   
   ClassDef(SIDISKalTrackFinder,0)

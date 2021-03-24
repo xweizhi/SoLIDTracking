@@ -24,8 +24,8 @@ export VERBOSE = 1
 export TESTCODE = 1
 # Compile support code for MC input data
 export MCDATA = 1
-#export SIDIS = 1
-export PVDIS = 1
+export SIDIS = 1
+#export PVDIS = 1
 
 #export I387MATH = 1
 export EXTRAWARN = 1

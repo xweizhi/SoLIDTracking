@@ -30,7 +30,7 @@ SoLKalFieldStepper::~SoLKalFieldStepper()
 //_________________________________________________________________
 void SoLKalFieldStepper::UseDefaultStep()
 {
-  initialStepSize = 0.2;     //m
+  /*initialStepSize = 0.2;     //m
   stepSizeDec     = 0.75;
   stepSizeInc     = 1.25;
   maxStepSize     = 0.5;     //m
@@ -39,16 +39,18 @@ void SoLKalFieldStepper::UseDefaultStep()
   maxPrecision    = 1.e-5;
   maxNumSteps     = 1e3;
   maxDist         = 5.e-3;   //m
-  minLengthCalcQ  = 1e-2;    //m
+  minLengthCalcQ  = 1e-2;    //m*/
+  
+  UseFineStep();
 }
 //_________________________________________________________________
 void SoLKalFieldStepper::UseFineStep()
 {
-  initialStepSize = 0.02;     //m
+  initialStepSize = 0.01;     //m
   stepSizeDec     = 0.75;
   stepSizeInc     = 1.25;
   maxStepSize     = 0.05;     //m
-  minStepSize     = 0.01;    //m
+  minStepSize     = 0.05;    //m
   minPrecision    = 1.e-4;
   maxPrecision    = 1.e-5;
   maxNumSteps     = 1e3;

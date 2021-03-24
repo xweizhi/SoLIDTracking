@@ -1107,7 +1107,8 @@ StripData_t SoLIDGEMReadOut::VMMChargeDep( const vector<Float_t>& amp )
     assert( amp.size() >= 1 );
     Float_t adc = amp[0];
     Bool_t pass = true; 
-    Float_t time = 0.;
+    Float_t time = amp[1];
+    if (time < 197 || time > 241 ) pass = false;
     return StripData_t(adc, adc, time, pass);
 }
 //______________________________________________________________________________________

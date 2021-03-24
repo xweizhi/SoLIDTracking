@@ -11,6 +11,14 @@ SoLKalTrackSystem::SoLKalTrackSystem(Int_t n)
              fIsGood(kTRUE), fNMissingHits(0), 
              fNHits(-1), fNDF(0), fSeedType(kTriplet), fChi2(0.)
 {
+    fMass = 0.;
+    fCharge = 0.;
+    fIsElectron = kTRUE;
+    fAngleFlag = 0; 
+    fMomentum = 0.;
+    fTheta = 0.;
+    fPhi = 0.;
+    fVertexZ = 0.; 
 }
 //___________________________________________________________________
 SoLKalTrackSystem::~SoLKalTrackSystem()

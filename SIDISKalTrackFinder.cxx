@@ -26,6 +26,7 @@ fDetConf(detConf), fIsMC(isMC),fNGoodTrack(0)
    fSeedEfficiency[i] = false;
    fMcTrackEfficiency[i] = false;
   }
+  fElectronVertexZ = -1e6;
 }
 //__________________________________________________________________________
 SIDISKalTrackFinder::~SIDISKalTrackFinder()
@@ -59,6 +60,8 @@ void SIDISKalTrackFinder::Clear( Option_t* opt )
   
   map< SeedType, vector<DoubletSeed> >::iterator itt;
   for (itt = fSeedPool.begin(); itt != fSeedPool.end(); itt++) { (itt->second).clear(); }
+  
+  fElectronVertexZ = -1e6;
 }
 //______________________________________________________________________________
 Int_t SIDISKalTrackFinder::ReadDatabase (const TDatime& date)
@@ -71,41 +74,43 @@ Int_t SIDISKalTrackFinder::ReadDatabase (const TDatime& date)
           { "target_center",               &fTargetCenter,                   kDouble, 0, 0},
           { "target_length",               &fTargetLength,                   kDouble, 0, 0},
           { "chi2_per_ndf_cut",            &fChi2PerNDFCut,                  kDouble, 0, 0},
-          { "theta_min",                    fThetaMinCut,                    kDouble, 2, 0},
-          { "theta_max",                    fThetaMaxCut,                    kDouble, 2, 0},
-          { "momentum_min",                 fMomMinCut,                      kDouble, 2, 0},
-          { "momentum_max",                 fMomMaxCut,                      kDouble, 2, 0},
+          { "theta_min",                    fThetaMinCut,                    kDouble, 3, 0},
+          { "theta_max",                    fThetaMaxCut,                    kDouble, 3, 0},
+          { "momentum_min",                 fMomMinCut,                      kDouble, 3, 0},
+          { "momentum_max",                 fMomMaxCut,                      kDouble, 3, 0},
           { "cell_edge_cut",                fCellEdgeCut,                    kDouble, 2, 0},
-          { "coarse_cell_edge_cut",         fCoarseCellEdgeCut,              kDouble, 2, 0},
-          { "backplane_rlimit_min",        &fRlimitMin[0],                   kDouble, 2, 0},
-          { "backplane_rlimit_max",        &fRlimitMax[0],                   kDouble, 2, 0},
-          { "midplane_rlimit_min",         &fRlimitMin[1],                   kDouble, 2, 0},
-          { "midplane_rlimit_max",         &fRlimitMax[1],                   kDouble, 2, 0},
-          { "frontplane_rlimit_min",       &fRlimitMin[2],                   kDouble, 2, 0},
-          { "frontplane_rlimit_max",       &fRlimitMax[2],                   kDouble, 2, 0},
-          { "midback_dr_min",              &fDeltaRMin[0],                   kDouble, 2, 0},
-          { "midback_dr_max",              &fDeltaRMax[0],                   kDouble, 2, 0},
-          { "frontmid_dr_min",             &fDeltaRMin[1],                   kDouble, 2, 0},
-          { "frontmid_dr_max",             &fDeltaRMax[1],                   kDouble, 2, 0},
-          { "frontback_dr_min",            &fDeltaRMin[2],                   kDouble, 2, 0},
-          { "frontback_dr_max",            &fDeltaRMax[2],                   kDouble, 2, 0},
-          { "midback_dphi_min",            &fDeltaPhiMin[0],                 kDouble, 2, 0},
-          { "midback_dphi_max",            &fDeltaPhiMax[0],                 kDouble, 2, 0},
-          { "frontmid_dphi_min",           &fDeltaPhiMin[1],                 kDouble, 2, 0},
-          { "frontmid_dphi_max",           &fDeltaPhiMax[1],                 kDouble, 2, 0},
-          { "frontback_dphi_min",          &fDeltaPhiMin[2],                 kDouble, 2, 0},
-          { "frontback_dphi_max",          &fDeltaPhiMax[2],                 kDouble, 2, 0},
-          { "backec_dr_min",               &fDeltaRMin[3],                   kDouble, 2, 0},
-          { "backec_dr_max",               &fDeltaRMax[3],                   kDouble, 2, 0},
-          { "backec_dphi_min",             &fDeltaPhiMin[3],                 kDouble, 2, 0},
-          { "backec_dphi_max",             &fDeltaPhiMax[3],                 kDouble, 2, 0},
-          { "midec_dr_min",                &fDeltaRMin[4],                   kDouble, 2, 0},
-          { "midec_dr_max",                &fDeltaRMax[4],                   kDouble, 2, 0},
-          { "midec_dphi_min",              &fDeltaPhiMin[4],                 kDouble, 2, 0},
-          { "midec_dphi_max",              &fDeltaPhiMax[4],                 kDouble, 2, 0},
+          { "coarse_cell_edge_cut",         fCoarseCellEdgeCut,              kDouble, 3, 0},
+          { "backplane_rlimit_min",        &fRlimitMin[0],                   kDouble, 3, 0},
+          { "backplane_rlimit_max",        &fRlimitMax[0],                   kDouble, 3, 0},
+          { "midplane_rlimit_min",         &fRlimitMin[1],                   kDouble, 3, 0},
+          { "midplane_rlimit_max",         &fRlimitMax[1],                   kDouble, 3, 0},
+          { "frontplane_rlimit_min",       &fRlimitMin[2],                   kDouble, 3, 0},
+          { "frontplane_rlimit_max",       &fRlimitMax[2],                   kDouble, 3, 0},
+          { "midback_dr_min",              &fDeltaRMin[0],                   kDouble, 3, 0},
+          { "midback_dr_max",              &fDeltaRMax[0],                   kDouble, 3, 0},
+          { "frontmid_dr_min",             &fDeltaRMin[1],                   kDouble, 3, 0},
+          { "frontmid_dr_max",             &fDeltaRMax[1],                   kDouble, 3, 0},
+          { "frontback_dr_min",            &fDeltaRMin[2],                   kDouble, 3, 0},
+          { "frontback_dr_max",            &fDeltaRMax[2],                   kDouble, 3, 0},
+          { "midback_dphi_min",            &fDeltaPhiMin[0],                 kDouble, 3, 0},
+          { "midback_dphi_max",            &fDeltaPhiMax[0],                 kDouble, 3, 0},
+          { "frontmid_dphi_min",           &fDeltaPhiMin[1],                 kDouble, 3, 0},
+          { "frontmid_dphi_max",           &fDeltaPhiMax[1],                 kDouble, 3, 0},
+          { "frontback_dphi_min",          &fDeltaPhiMin[2],                 kDouble, 3, 0},
+          { "frontback_dphi_max",          &fDeltaPhiMax[2],                 kDouble, 3, 0},
+          { "backec_dr_min",               &fDeltaRMinBC[0],                 kDouble, 6, 0},
+          { "backec_dr_max",               &fDeltaRMaxBC[0],                 kDouble, 6, 0},
+          { "backec_dphi_min",             &fDeltaPhiMinBC[0],               kDouble, 6, 0},
+          { "backec_dphi_max",             &fDeltaPhiMaxBC[0],               kDouble, 6, 0},
+          { "midec_dr_min",                &fDeltaRMinBC[1],                 kDouble, 6, 0},
+          { "midec_dr_max",                &fDeltaRMaxBC[1],                 kDouble, 6, 0},
+          { "midec_dphi_min",              &fDeltaPhiMinBC[1],               kDouble, 6, 0},
+          { "midec_dphi_max",              &fDeltaPhiMaxBC[1],               kDouble, 6, 0},
           { "coarse_ec_pos_cut",            fCoarseECPosCut,                 kDouble, 2, 0},
+          { "coarse_spd_r_cut",             fCoarseSPDRCut,                  kDouble, 4, 0},
+          { "coarse_spd_phi_cut",           fCoarseSPDPhiCut,                kDouble, 4, 0},
           { "ec_pos_cut",                  &fECPosCut,                       kDouble, 0, 0},
-          { "ec_energy_match",             &fECEnergyMatch,                  kInt,    2, 0},
+          { "ec_energy_match",             &fECEnergyMatch,                  kInt,    3, 0},
           { 0 }
         };
         Int_t err = LoadDB (file, date, request, fPrefix);
@@ -116,7 +121,18 @@ Int_t SIDISKalTrackFinder::ReadDatabase (const TDatime& date)
         fclose(file);
         throw;
     }
-    
+
+    for (int i=0; i<3; i++) cout<<fThetaMinCut[i]<<" ";
+    cout<<endl;
+    for (int i=0; i<3; i++) cout<<fThetaMaxCut[i]<<" ";
+    cout<<endl;
+    for (int i=0; i<3; i++) cout<<fThetaMaxCut[i]<<" ";
+    cout<<endl;
+    for (int i=0; i<3; i++) cout<<fMomMinCut[i]<<" ";
+    cout<<endl;
+    for (int i=0; i<3; i++) cout<<fMomMaxCut[i]<<" ";
+    cout<<endl;
+
     return kOK;
 }
 //___________________________________________________________________________
@@ -126,7 +142,9 @@ void SIDISKalTrackFinder::ProcessHits(TClonesArray* theTracks)
   fNSeeds = 0;
   assert(fCaloHits == nullptr);
   fCaloHits = fECal->GetCaloHits();
-  
+  //cout<<"starting electron tracking"<<endl;
+  //cout<<fCoarseTracks->GetEntries()<<" "<<fCoarseTracks->GetLast()+1<<endl; 
+  fHadronFlag = false;
   //forward angle seed finding
   FindDoubletSeed(4, 5, kFAEC);
   FindDoubletSeed(3, 4, kFAEC);
@@ -147,6 +165,30 @@ void SIDISKalTrackFinder::ProcessHits(TClonesArray* theTracks)
   FindandAddVertex();
   ECalFinalMatch();
   FinalSelection(theTracks);
+  //cout<<"done electron tracking"<<endl; 
+  //cout<<fCoarseTracks->GetEntries()<<" "<<fCoarseTracks->GetLast()+1<<endl;
+  
+  
+  fHadronFlag = true;
+  
+  if (fCoarseTracks->GetEntries() != 0) 
+  fCoarseTracks->Delete();
+  fCoarseTracks->Clear();
+  for (itt = fSeedPool.begin(); itt != fSeedPool.end(); itt++) { (itt->second).clear(); }
+  fNSeeds = 0;
+  //cout<<fCoarseTracks->GetEntries()<<" "<<fCoarseTracks->GetLast()+1<<endl;
+  
+
+  //forward angle seed finding
+  FindDoubletSeed(4, 5, kFAEC);
+  FindDoubletSeed(3, 4, kFAEC);
+  FindDoubletSeed(3, 5, kFAEC);
+  MergeSeed();
+  //cout<<fCoarseTracks->GetEntries()<<" "<<fCoarseTracks->GetLast()+1<<endl;
+  TrackFollow();
+  FindandAddVertex();
+  FinalSelection(theTracks);
+  
   fEventNum++;
 }
 
@@ -162,28 +204,31 @@ void SIDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType typ
   SeedType seedType = kMidBack;
   int countSeed = 0;
   
+  int ttype = type;
+  if (fHadronFlag) ttype += 1;
+  
   double charge = 0;
   if (type == kFAEC){
     if (planek == 5 && planej == 4){
       seedType = kMidBack;
-      rlimit[1][0] = fRlimitMin[1][type]; rlimit[1][1] = fRlimitMax[1][type];
-      rlimit[0][0] = fRlimitMin[0][type]; rlimit[0][1] = fRlimitMax[0][type];
-      deltar[0]=fDeltaRMin[0][type]; deltar[1]=fDeltaRMax[0][type]; 
-      philimit[0]=fDeltaPhiMin[0][type]; philimit[1]=fDeltaPhiMax[0][type];
+      rlimit[1][0] = fRlimitMin[1][ttype]; rlimit[1][1] = fRlimitMax[1][ttype];
+      rlimit[0][0] = fRlimitMin[0][ttype]; rlimit[0][1] = fRlimitMax[0][ttype];
+      deltar[0]=fDeltaRMin[0][ttype]; deltar[1]=fDeltaRMax[0][ttype]; 
+      philimit[0]=fDeltaPhiMin[0][ttype]; philimit[1]=fDeltaPhiMax[0][ttype];
     }
     else if(planek == 4 && planej == 3){
       seedType = kFrontMid;
-      rlimit[1][0] = fRlimitMin[2][type]; rlimit[1][1] = fRlimitMax[2][type]; 
-      rlimit[0][0] = fRlimitMin[1][type]; rlimit[0][1] = fRlimitMax[1][type];
-      deltar[0]=fDeltaRMin[1][type]; deltar[1]=fDeltaRMax[1][type]; 
-      philimit[0]=fDeltaPhiMin[1][type]; philimit[1]=fDeltaPhiMax[1][type];
+      rlimit[1][0] = fRlimitMin[2][ttype]; rlimit[1][1] = fRlimitMax[2][ttype]; 
+      rlimit[0][0] = fRlimitMin[1][ttype]; rlimit[0][1] = fRlimitMax[1][ttype];
+      deltar[0]=fDeltaRMin[1][ttype]; deltar[1]=fDeltaRMax[1][ttype]; 
+      philimit[0]=fDeltaPhiMin[1][ttype]; philimit[1]=fDeltaPhiMax[1][ttype];
     }
     else if (planek == 5 && planej == 3){
       seedType = kFrontBack;
-      rlimit[1][0] = fRlimitMin[2][type]; rlimit[1][1] = fRlimitMax[2][type];
-      rlimit[0][0] = fRlimitMin[0][type]; rlimit[0][1] = fRlimitMax[0][type];
-      deltar[0]=fDeltaRMin[2][type]; deltar[1]=fDeltaRMax[2][type]; 
-      philimit[0]=fDeltaPhiMin[2][type]; philimit[1]=fDeltaPhiMax[2][type];
+      rlimit[1][0] = fRlimitMin[2][ttype]; rlimit[1][1] = fRlimitMax[2][ttype];
+      rlimit[0][0] = fRlimitMin[0][ttype]; rlimit[0][1] = fRlimitMax[0][ttype];
+      deltar[0]=fDeltaRMin[2][ttype]; deltar[1]=fDeltaRMax[2][ttype]; 
+      philimit[0]=fDeltaPhiMin[2][ttype]; philimit[1]=fDeltaPhiMax[2][ttype];
     } 
   }
   else{ 
@@ -224,8 +269,8 @@ void SIDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType typ
       if (hitk->GetR() < rlimit[0][0]) continue;
       if (hitk->GetR() > rlimit[0][1]) break; // check if the hit is within r range
       
-      Double_t matchEnergy = TriggerCheck(hitk, type);
-      if (matchEnergy < 0.) continue;
+      Double_t matchEnergy = 0.;
+      if (!TriggerCheck(hitk, type, matchEnergy)) continue;
       
       vector<Int_t> jChamberList;
       GetHitChamberList(jChamberList, k, 3);
@@ -268,13 +313,13 @@ void SIDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType typ
           double initPhi   = 0;
           if (!CalInitParForPair(hitj, hitk, charge, initMom, initTheta, initPhi, type)) continue;
           
-          if (type == kFAEC && (initTheta > fThetaMaxCut[kFAEC] || initTheta < fThetaMinCut[kFAEC])) continue;
+          if (type == kFAEC && (initTheta > fThetaMaxCut[ttype] || initTheta < fThetaMinCut[ttype])) continue;
           if (type == kLAEC && (initTheta > fThetaMaxCut[kLAEC] || initTheta < fThetaMinCut[kLAEC])) continue;
-          if (type == kFAEC && (initMom > fMomMaxCut[kFAEC] || initMom < fMomMinCut[kFAEC])) continue;
+          if (type == kFAEC && (initMom > fMomMaxCut[ttype] || initMom < fMomMinCut[ttype])) continue;
           if (type == kLAEC && (initMom > fMomMaxCut[kLAEC] || initMom < fMomMinCut[kLAEC])) continue;
           
           Double_t e_reso = fECal->GetEReso()/sqrt(matchEnergy);
-          if (fECEnergyMatch[type] && (matchEnergy - initMom)/matchEnergy > 5.*e_reso) continue;
+          if (fECEnergyMatch[ttype] && (matchEnergy - initMom)/matchEnergy > 5.*e_reso) continue;
 
           
           TVector3 initDir(cos(initPhi), sin(initPhi), 1./tan(initTheta));
@@ -287,25 +332,44 @@ void SIDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType typ
           
           Bool_t isSeed = false;
           Double_t toZ = fECal->GetECZ(type);
-		      if (type == kFAEC){
+		    if (type == kFAEC){
         
-            fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
-                                               charge, stepSize, finalMomentum, finalPosition);
-            for (UInt_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+              fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
+                                                 charge, stepSize, finalMomentum, finalPosition);
+              for (UInt_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
 	            if ( ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fECID != kFAEC) continue; //not FAEC hit
-	            if (sqrt( pow(finalPosition.X() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos, 2) +  
+	            Int_t dettype = ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fSubDetID;
+	            if (fHadronFlag) {
+	              if (dettype == 0) continue;
+	            }
+	            else{
+	              if (dettype != 0) continue;
+	            }
+	            Double_t projR   = sqrt( pow(finalPosition.X(), 2) + pow(finalPosition.Y(), 2) );
+	            Double_t projPhi = atan2(finalPosition.Y(), finalPosition.X());
+	            Double_t spdR    = sqrt(pow(((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos, 2) 
+	                                  + pow(((SoLIDCaloHit*)fCaloHits->At(ec_count))->fYPos, 2));
+	            Double_t spdPhi  = atan2(((SoLIDCaloHit*)fCaloHits->At(ec_count))->fYPos, ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos);
+	            Double_t rDiff   = fabs(spdR - projR);
+	            Double_t phiDiff = fabs(TVector2::Phi_mpi_pi(spdPhi - projPhi));
+	            if (!fHadronFlag){
+	              if (sqrt( pow(finalPosition.X() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos, 2) +  
 	                  pow(finalPosition.Y() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fYPos, 2) ) < fCoarseECPosCut[type] ) isSeed = true;
-	          } 
+	            }
+	            else{
+	              if (rDiff < fCoarseSPDRCut[dettype-1] && phiDiff < fCoarseSPDPhiCut[dettype-1]) isSeed = true;
+	            } 
 		      }
-		      else if (type == kLAEC){
-            fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
+		    }
+		    else if (type == kLAEC){
+              fFieldStepper->PropagationClassicalRK4(initMomentum, initPosition, toZ, 
                                                charge, stepSize, finalMomentum, finalPosition);
-            for (UInt_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
+              for (UInt_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
 	            if ( ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fECID != kLAEC) continue; //not FAEC hit
 	            if (sqrt( pow(finalPosition.X() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fXPos, 2) +  
 	                  pow(finalPosition.Y() - ((SoLIDCaloHit*)fCaloHits->At(ec_count))->fYPos, 2) ) < fCoarseECPosCut[type] ) isSeed = true;
 	          } 
-		      }
+		    }
 		      if (!isSeed) continue;
           
           
@@ -317,7 +381,7 @@ void SIDISKalTrackFinder::FindDoubletSeed(Int_t planej, Int_t planek, ECType typ
 		      double ReconZ = fTargetCenter + (1./(pow(tx,2) + pow(ty,2)))*
                        (tx*(fBPMX-finalPosition.X()) + ty*(fBPMY-finalPosition.Y()) );
       
-          if (type == kFAEC && fabs(ReconZ - fTargetCenter) > (fTargetLength/2. + fCoarseCellEdgeCut[kFAEC] ) ) continue;
+          if (type == kFAEC && fabs(ReconZ - fTargetCenter) > (fTargetLength/2. + fCoarseCellEdgeCut[ttype] ) ) continue;
           if (type == kLAEC && fabs(ReconZ - fTargetCenter) > (fTargetLength/2. + fCoarseCellEdgeCut[kLAEC] ) ) continue;
           
           
@@ -369,9 +433,16 @@ void SIDISKalTrackFinder::MergeSeed()
             
             SoLKalTrackSite & initSite =  SiteInitWithSeed(&(fSeedPool[kMidBack].at(i)));
             SoLKalTrackSystem *thisSystem = new ((*fCoarseTracks)[fNSeeds++]) SoLKalTrackSystem();
-            thisSystem->SetMass(kElectronMass);
+            //cout<<"n hits in track "<<thisSystem->GetLast()+1<<" "<<thisSystem->GetEntries()<<endl;
             thisSystem->SetCharge(fSeedPool[kMidBack].at(i).charge);
-            thisSystem->SetElectron(kTRUE);
+            if (!fHadronFlag){
+                thisSystem->SetElectron(kTRUE);
+                thisSystem->SetMass(kElectronMass);
+            }
+            else {
+                thisSystem->SetElectron(kFALSE);
+                thisSystem->SetMass(kPimMass);
+            }
             thisSystem->SetAngleFlag(fSeedPool[kMidBack].at(i).flag);
             thisSystem->SetSeedType(kTriplet);
             thisSystem->SetOwner();
@@ -401,9 +472,16 @@ void SIDISKalTrackFinder::MergeSeed()
       if (!thisVector.at(i).isActive) continue;
       SoLKalTrackSite & initSite =  SiteInitWithSeed(&(thisVector.at(i)));
       SoLKalTrackSystem *thisSystem = new ((*fCoarseTracks)[fNSeeds++]) SoLKalTrackSystem();
-      thisSystem->SetMass(kElectronMass);
+      //cout<<"n hits in track "<<thisSystem->GetLast()+1<<" "<<thisSystem->GetEntries()<<endl;
       thisSystem->SetCharge(thisVector.at(i).charge);
-      thisSystem->SetElectron(kTRUE);
+      if (!fHadronFlag){
+        thisSystem->SetElectron(kTRUE);
+        thisSystem->SetMass(kElectronMass);
+      }
+      else {
+        thisSystem->SetElectron(kFALSE);
+        thisSystem->SetMass(kPimMass);
+      }
       thisSystem->SetAngleFlag(thisVector.at(i).flag);
       thisSystem->SetSeedType(thisVector.at(i).type);
       thisSystem->SetOwner();
@@ -427,7 +505,6 @@ void SIDISKalTrackFinder::TrackFollow()
 {
   //this function is responsible for propagating the seed track toward the next tracker, find suitable hits
   //the process stop until the track reach the first tracker upstream (track searching always go backward)
-  
   for (Int_t i=0; i<fCoarseTracks->GetLast()+1; i++){
     SoLKalTrackSystem* thisSystem = (SoLKalTrackSystem*)(fCoarseTracks->At(i));
     thisSystem->CheckTrackStatus();
@@ -552,11 +629,12 @@ void SIDISKalTrackFinder::TrackFollow()
 //___________________________________________________________________________________________________________________
 void SIDISKalTrackFinder::FindandAddVertex()
 {
+   //cout<<fHadronFlag<<endl;
    fFieldStepper->UseFineStep();
    for (Int_t i=0; i<fCoarseTracks->GetLast()+1; i++){
       SoLKalTrackSystem* thisSystem = (SoLKalTrackSystem*)(fCoarseTracks->At(i));
       thisSystem->SetCurInstancePtr(thisSystem);
-      
+      //cout<<"track status "<<thisSystem->GetTrackStatus()<<endl; 
       thisSystem->CheckTrackStatus();
       if (thisSystem->GetTrackStatus() == kFALSE) continue; //skip bad tracks
       
@@ -593,6 +671,14 @@ void SIDISKalTrackFinder::FindandAddVertex()
         thisSystem->SetTrackStatus(kFALSE);
         continue;
       }
+      if (fHadronFlag && thisSystem->GetAngleFlag() == kFAEC && fElectronVertexZ > -1e5){
+        //cout<<fElectronVertexZ<<" "<<vertexz<<" vertexz info"<<endl;
+        if (fabs(vertexz - fElectronVertexZ) > 0.1) {
+          thisSystem->SetTrackStatus(kFALSE);
+          continue;
+        }
+      }
+      
       
       //propagate the state vector to the interaction vertex that just found
       //not sure if this is the best way to add vertex
@@ -617,7 +703,7 @@ void SIDISKalTrackFinder::FindandAddVertex()
         vertex_vdir.SetX(temp_tx * vertex_vdir.Z());
         vertex_vdir.SetY(temp_ty * vertex_vdir.Z());
         vertex_vdir = vertex_vdir.Unit();
-        
+        //cout<<fHadronFlag<<" "<<i<<" "<<thisSystem->GetCharge()/temp_qp<<endl; 
         thisSystem->SetMomentum(thisSystem->GetCharge()/temp_qp);
         thisSystem->SetTheta(acos(1./sqrt(1. + pow( (vertex_vdir.X()/vertex_vdir.Z()), 2) 
                              + pow((vertex_vdir.Y()/vertex_vdir.Z()) , 2))));
@@ -628,8 +714,10 @@ void SIDISKalTrackFinder::FindandAddVertex()
       else{
         thisSystem->SetTrackStatus(kFALSE); 
       }
-      if (thisSystem->GetMomentum() > fMomMaxCut[thisSystem->GetAngleFlag()] || 
-          thisSystem->GetMomentum() < fMomMinCut[thisSystem->GetAngleFlag()]) thisSystem->SetTrackStatus(kFALSE);
+      int detType = thisSystem->GetAngleFlag();
+      if (detType == kFAEC && fHadronFlag) detType += 1;
+      if (thisSystem->GetMomentum() > fMomMaxCut[detType] || 
+          thisSystem->GetMomentum() < fMomMinCut[detType]) thisSystem->SetTrackStatus(kFALSE);
       
       currentState.ClearAttemptSV();
       delete &vertexSite;
@@ -653,7 +741,6 @@ void SIDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
   
     SoLKalTrackSystem *thisSystem = (SoLKalTrackSystem*)(fCoarseTracks->At(i));
     thisSystem->SetCurInstancePtr(thisSystem);
-    
     if (!thisSystem->GetTrackStatus()) continue;
     Int_t flag = 0;
     
@@ -684,6 +771,7 @@ void SIDISKalTrackFinder::FinalSelection(TClonesArray *theTracks)
         newtrack = new ((*theTracks)[fNGoodTrack++]) SoLIDTrack();
       }
     CopyTrack(newtrack, thisSystem);
+    if (!fHadronFlag && fElectronVertexZ < -1e5) fElectronVertexZ = thisSystem->GetVertexZ();
     }
     
   }
@@ -787,7 +875,7 @@ inline SoLKalTrackSite & SIDISKalTrackFinder::SiteInitWithSeed(DoubletSeed* this
   return initSite;
 }
 //___________________________________________________________________________________________________________________
-inline Double_t SIDISKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType type)
+inline bool SIDISKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType type, Double_t& matchEnergy)
 {
   if (type == kLAEC){
     for (Int_t ec_count=0; ec_count<fCaloHits->GetLast()+1; ec_count++){
@@ -799,12 +887,14 @@ inline Double_t SIDISKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType ty
 	    			  	   TMath::Power(thisHit->fYPos, 2) );
 	    Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	    Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
-	    if (theHit->GetTrackerID()==2 && (tmpDeltaPhi < fDeltaPhiMax[4][type] && tmpDeltaPhi > fDeltaPhiMin[4][type]) && 
-	       (tmpDeltaR < fDeltaRMax[4][type] && tmpDeltaR > fDeltaRMin[4][type])){
-            return thisHit->fEdp;
-        }else if (theHit->GetTrackerID()==3 && (tmpDeltaPhi<fDeltaPhiMax[3][type] && tmpDeltaPhi> fDeltaPhiMin[3][type]) && 
-                 (tmpDeltaR<fDeltaRMax[3][type] && tmpDeltaR > fDeltaRMin[3][type]) ){
-            return thisHit->fEdp;
+	    if (theHit->GetTrackerID()==2 && (tmpDeltaPhi < fDeltaPhiMaxBC[1][0] && tmpDeltaPhi > fDeltaPhiMinBC[1][0]) && 
+	       (tmpDeltaR < fDeltaRMaxBC[1][0] && tmpDeltaR > fDeltaRMinBC[1][0])){
+            matchEnergy = thisHit->fEdp;
+            return true;
+        }else if (theHit->GetTrackerID()==3 && (tmpDeltaPhi<fDeltaPhiMaxBC[0][0] && tmpDeltaPhi> fDeltaPhiMinBC[0][0]) && 
+                 (tmpDeltaR<fDeltaRMaxBC[0][0] && tmpDeltaR > fDeltaRMinBC[0][0]) ){
+            matchEnergy = thisHit->fEdp;
+            return true;
         }
 	  }
   }
@@ -813,21 +903,30 @@ inline Double_t SIDISKalTrackFinder::TriggerCheck(SoLIDGEMHit *theHit, ECType ty
 	    {
 	      SoLIDCaloHit* thisHit = (SoLIDCaloHit*)(fCaloHits->At(ec_count));
 	      if (thisHit->fECID != kFAEC) continue; //not FAEC hit
+	      if (fHadronFlag) {
+	        if (thisHit->fSubDetID == 0) continue;
+	      }
+	      else{
+	        if (thisHit->fSubDetID != 0) continue;
+	      }
 	      Double_t ecHitPhi = TMath::ATan2(thisHit->fYPos, thisHit->fXPos);
 	      Double_t ecHitR = TMath::Sqrt( TMath::Power(thisHit->fXPos, 2) + 
 				  	   TMath::Power(thisHit->fYPos, 2) );
 	      Double_t tmpDeltaPhi = CalDeltaPhi(ecHitPhi, theHit->GetPhi());
 	      Double_t tmpDeltaR   = CalDeltaR(ecHitR, theHit->GetR());
-	      if (theHit->GetTrackerID()==4 && (tmpDeltaPhi < fDeltaPhiMax[4][type] && tmpDeltaPhi > fDeltaPhiMin[4][type]) && 
-	         (tmpDeltaR < fDeltaRMax[4][type] && tmpDeltaR > fDeltaRMin[4][type])){
-	        return thisHit->fEdp;
-	      }else if (theHit->GetTrackerID()==5 && (tmpDeltaPhi<fDeltaPhiMax[3][type] && tmpDeltaPhi> fDeltaPhiMin[3][type]) && 
-	               (tmpDeltaR<fDeltaRMax[3][type] && tmpDeltaR > fDeltaRMin[3][type]) ){
-	        return thisHit->fEdp;
+	      Int_t    dettype     = thisHit->fSubDetID+1;
+	      if (theHit->GetTrackerID()==4 && (tmpDeltaPhi < fDeltaPhiMaxBC[1][dettype] && tmpDeltaPhi > fDeltaPhiMinBC[1][dettype]) && 
+	         (tmpDeltaR < fDeltaRMaxBC[1][dettype] && tmpDeltaR > fDeltaRMinBC[1][dettype])){
+	        matchEnergy = thisHit->fEdp;
+	        return true;
+	      }else if (theHit->GetTrackerID()==5 && (tmpDeltaPhi<fDeltaPhiMaxBC[0][dettype] && tmpDeltaPhi> fDeltaPhiMinBC[0][dettype]) && 
+	               (tmpDeltaR<fDeltaRMaxBC[0][dettype] && tmpDeltaR > fDeltaRMinBC[0][dettype]) ){
+	        matchEnergy = thisHit->fEdp;
+	        return true;
 	      }
 	    }
   }
-  return -1;
+  return false;
 }
 //___________________________________________________________________________________________________________________
 inline SoLIDGEMHit* SIDISKalTrackFinder::FindCloestHitInWindow(double &x, double &y){
@@ -903,6 +1002,8 @@ inline void SIDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSyst
   soltrack->SetECX(kaltrack->fDeltaECX);
   soltrack->SetECY(kaltrack->fDeltaECY);
   soltrack->SetECE(kaltrack->fDeltaECE);
+  soltrack->SetElectron(kaltrack->IsElectron());
+  //cout<<fNGoodTrack<<" "<<kaltrack->GetMomentum()<<" "<<kaltrack->GetTheta()<<endl;
   
   //start from 1 because the 0th is the dummy site that we used to initialize Kalman Filter
   //TODO remember not to add the last one since later it will be the BPM, not GEM hit
@@ -912,7 +1013,7 @@ inline void SIDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSyst
     Int_t layer = 0;
     
     thishit = (SoLIDGEMHit*)(static_cast<SoLKalTrackSite*>(kaltrack->At(j))->GetPredInfoHit());
-    //thishit->SetUsed();
+    thishit->SetUsed();
     layer = thishit->GetTrackerID();
     
     map< Int_t, vector<SoLIDGEMHit*> >::iterator it = fGoodHits.find(layer);
@@ -928,6 +1029,7 @@ inline void SIDISKalTrackFinder::CopyTrack(SoLIDTrack* soltrack, SoLKalTrackSyst
       
     assert(thishit != 0);
     soltrack->AddHit(thishit);
+    //cout<<layer<<" hit info "<<thishit->GetX()<<" "<<thishit->GetY()<<endl;
   }
   
   //for back track info

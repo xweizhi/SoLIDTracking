@@ -540,6 +540,7 @@ Int_t SoLIDTrackerSystem::DefineVariables( EMode mode )
       { "BPM.x",             "BPM measurement for x coordinate",  "fBPMX"                           },
       { "BPM.y",             "BPM measurement for y coordinate",  "fBPMY"                           },
       { "track.selectflag",  "select flag",                        "fTracks.SoLIDMCTrack.GetSelectFlag()"},
+      { "track.iselectron",  "whether the track is an electron track", "fTracks.SoLIDMCTrack.IsElectron()"},
       { 0 }
     };
     ret = DefineVarsFromList( mcvars, mode );

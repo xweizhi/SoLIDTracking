@@ -113,13 +113,14 @@ inline Int_t NumberOfSetBits( UInt_t v )
 class SoLIDCaloHit : public TObject{
   public:
   SoLIDCaloHit() {}
-  SoLIDCaloHit(Double_t xpos, Double_t ypos, Int_t plane, Double_t edp) :
-  fXPos(xpos), fYPos(ypos), fECID(plane), fEdp(edp) {}
+  SoLIDCaloHit(Double_t xpos, Double_t ypos, Int_t plane, Double_t edp, Int_t subid) :
+  fXPos(xpos), fYPos(ypos), fECID(plane), fEdp(edp), fSubDetID(subid) {}
   ~SoLIDCaloHit() {}
   Double_t fXPos;
   Double_t fYPos;
   Int_t    fECID;
   Double_t fEdp;
+  Int_t    fSubDetID;
   
   ClassDef(SoLIDCaloHit, 1)
 };

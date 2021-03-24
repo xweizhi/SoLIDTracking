@@ -7,6 +7,7 @@
 #include <cmath>
 //ROOT
 #include "TVector3.h"
+#include "TRandom3.h"
 //SoLIDTracking
 #include "SoLIDUtility.h"
 
@@ -20,6 +21,7 @@
 #define ZSTEP_TARGET 1
 #define RSTEP_TARGET 1
 #define ZSHIFT_TARGET 200
+#define FIELD_PRECISION 0.0
 
 using namespace std;
 
@@ -46,7 +48,7 @@ class SoLIDFieldMap
   Double_t  Br_target[ZSIZE_TARGET][RSIZE_TARGET];
   TVector3  fField;
   bool      targetFieldFlag;
-  
+  TRandom3  fFieldRNG;   
 };  
 
 #endif

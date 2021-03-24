@@ -22,7 +22,8 @@ SoLIDFieldMap::SoLIDFieldMap()
     
     fField.SetXYZ(0.,0.,0.);
     targetFieldFlag = false;
-  
+    fFieldRNG.SetSeed(0);
+    cout<<fFieldRNG.GetSeed()<<endl; 
     LoadFieldMap();
 }
 //__________________________________________________________________
@@ -39,6 +40,9 @@ void SoLIDFieldMap::LoadFieldMap()
   while(1){
     infile>>input[0]>>input[1]>>input[2]>>input[3];
     if (infile.eof()) break;
+
+    input[3] += fFieldRNG.Gaus(0., input[3]*FIELD_PRECISION);
+    input[2] += fFieldRNG.Gaus(0., input[2]*FIELD_PRECISION);
     
     int z_pos = fabs( (int)(input[1] + ZSHIFT) );
     int r_pos = fabs( (int)(input[0]) );
@@ -88,10 +92,19 @@ TVector3 & SoLIDFieldMap::GetBField(double x, double y, double z)
     }else{
 
         int z_max, z_min, r_max, r_min;
-        r_min = (int)r;
+        //r_min = (int)r;
+        //r_max = r_min + RSTEP;
+        //z_min = (int)z;
+        //z_max = z_min + ZSTEP;
+        r_min = (r)/RSTEP;
+        r_min *= RSTEP;
         r_max = r_min + RSTEP;
-        z_min = (int)z;
+        z_min = (z)/ZSTEP;
+        z_min *= ZSTEP;
         z_max = z_min + ZSTEP;
+
+        if (r_max > RSIZE - 1) r_max = RSIZE-1;
+        if (z_max > ZSIZE - 1) z_max = ZSIZE-1;
 
         double f21_Bz =  Bz[z_max][r_min];
         double f21_Br =  Br[z_max][r_min];

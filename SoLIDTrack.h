@@ -11,7 +11,7 @@ class SoLIDTrack : public TObject
   public:
   SoLIDTrack():fCoarseChi2(kINFINITY), fFineChi2(kINFINITY), fIsCoarseFitted(kFALSE), 
   fIsFineFitted(kFALSE), fStatus(1), fCharge(-1.), fMass(0.51e-3), 
-  fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.), fPhi(0.), fNDF(1), fSelectFlag(0) {}
+  fPID(11), fAngleFlag(0),fVertexZ(0.),fTheta(0.), fPhi(0.), fNDF(1), fSelectFlag(0), fIsElectron(true) {}
   ~SoLIDTrack(){fHits.clear();}
   
   virtual Int_t Compare( const TObject* obj ) const;
@@ -43,6 +43,8 @@ class SoLIDTrack : public TObject
   void         SetBackX(Double_t x)          { fBackX = x; }
   void         SetBackY(Double_t y)          { fBackY = y; }
   void         SetBackMom(Double_t mom)      { fBackMom = mom; }
+
+  void         SetElectron(Bool_t b)         { fIsElectron = b; }
   
  
   Bool_t       IsCoarseFitted()        const { return fIsCoarseFitted; }
@@ -170,6 +172,8 @@ class SoLIDTrack : public TObject
   Double_t     GetBackX()               const { return fBackX; }
   Double_t     GetBackY()               const { return fBackY; }
   Double_t     GetBackMom()             const { return fBackMom; }
+
+  Bool_t       IsElectron()               const { return fIsElectron; }
   
   
   static bool SortHitZ(const SoLIDGEMHit* a, const SoLIDGEMHit* b);
@@ -196,7 +200,8 @@ class SoLIDTrack : public TObject
   Int_t fNDF;
   Int_t fSelectFlag;                  //whether the track is the best within tracks that share
                                       // common hits
-  
+
+  Bool_t fIsElectron;  
   //back track info
   Double_t fBackTheta;
   Double_t fBackPhi;

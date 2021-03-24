@@ -46,7 +46,7 @@ class SoLIDECal : public THaSubDetector
   inline Double_t GetPosReso() const { return fPosReso; }
   inline Double_t GetEReso() const { return fEReso; }
   
-  void    SmearPosition(Float_t *x, Float_t *y, Int_t mode = 0);
+  void    SmearPosition(Float_t *x, Float_t *y, Int_t* id, Int_t mode = 0);
   void    SmearEnergy(Float_t *energy);
   protected:
   virtual Int_t     ReadDatabase( const TDatime& date );
@@ -64,11 +64,17 @@ class SoLIDECal : public THaSubDetector
   Double_t                        fPosReso;
   Double_t                        fEReso;
 #ifdef SIDIS
+  Int_t                           fUseMRPC;
   Double_t                        fMRPCPitchWidth;
   Int_t                           fMRPCNSectors;
   Double_t                        fMRPCPhiCover;
   Double_t                        fMRPCPhiReso;
   Double_t                        fMRPCRmin;
+  Int_t                           fUseSPD;
+  Int_t                           fSPDNRSegment;
+  Int_t                           fSPDNPhiSegment;
+  vector<Double_t>                fSPDRSegment;
+  Double_t                        fSPDPhiCover;
 #endif
   TClonesArray*                   fCaloHits;
   
